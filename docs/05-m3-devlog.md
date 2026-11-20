@@ -922,3 +922,44 @@ M4.7 的 `model_ratings` 写侧已落库（`cordis.patch.yml:476-516`，8 个规
 - **工作区级 AGENTS.md 纪律条是冗余的**：移除后两个模型族仍 8/8 主动调用预检工具 → 行为由插件的全局提示句 + 工具驱动，文档层没有增量。
 - 因此 §1 不恢复该纪律条；§7 的 M4.11 条目中 A 的描述已改为「从 §1 移除，只依赖插件全局提示句 + 工具」。
 - 后续若要进一步强化（跨 DSH 安装、或更弱的模型）：优先做 **skill**（按需加载、不占常驻系统提示、可携带更长流程与示例），其次是扩写 `SECTION_TEXT`（常驻、占提示预算，插件停用即失效）；不建议把纪律散落到各工作区的 `AGENTS.md`。
+
+## 21. 发布：使用细则 skill、会话审计、洁净室验证、GitHub 仓库（2026-11-21）
+
+### 21.1 触发与侦察
+- 用户（m03430）：「做使用细则skill，多模型会话审计，洁净室测试，确认有效好用后，发布到本DSH全局。所有都做完后，git，并建立github项目，把插件，设计文档，skill等全部上传并写好详细的首页项目说明。」
+- 侦察事实：本工作区此前**不是 git 仓库**；`gh` 未安装（winget 可用，最终未用，改走 REST API）；GitHub API 可达；`DSH_HOME=C:\Users\sir_c\.dsh`；全局 skills 目录 `C:\Users\sir_c\.dsh\skills` 已有 4 个既有 skill。
+- 体积实测（决定 `.gitignore` 边界）：gemini-eyes 657.5MB / 5515 files、plugin-orb-quota 227.5MB（去 node_modules+dist 后 32.6MB）、tmp 156.7MB、vendors 100.7MB、`mroute/tmp-plugins.json` 单文件 14.37MB。
+- 密钥扫描：对 346 个候选源文件跑 `sk-/gho_/ghp_/xoxb-/AKIA/PRIVATE KEY` 模式 → **零命中**，才允许公开。
+
+### 21.2 使用细则 skill（`skills/mroute-dispatch/`）
+- 交付 4 文件：`SKILL.md`（84 行，description 393 字符，中文触发词）、`references/tools.md`（101 行）、`references/troubleshooting.md`（100 行）、`check.mjs`（145 行，零依赖）。
+- 自检：`node skills/mroute-dispatch/check.mjs` → `OK`（frontmatter / name=目录名 / 触发词 / ≤160 行 / 无 tab / references≥20 行 / 无 `sir_c`·`C:\Users`·`sk-`·`Bearer`）。
+- 事实核对：worker 按源码复核 5 处并修正 3 处行号 —— `lib/tool-dispatch-plan.js:18`（`TOOL_NAME='mroute_dispatch_plan'`）、`:21`（`FRESH_SECONDS=300`）、`:244-258`（校验先于 IO）；`lib/capability-need.js:14`（`RATING_RANK none0/fair1/good2/excellent3`）；`lib/config-schema.js:206-211`（`enforce_gate` 占位不接 `tools.guard`）。
+- 全局发布（lead 执行）：`Copy-Item skills\mroute-dispatch → C:\Users\sir_c\.dsh\skills\mroute-dispatch`（4 文件 5597 / 7116 / 7596 / 7537 字节）。
+- **生效证据**：宿主随即重发 skills 目录，本会话 catalog 出现 `mroute-dispatch`（描述为该 skill frontmatter 的触发词版本）——这是「已对所有工作区全局生效」的机读证据。
+
+### 21.3 洁净室验证（无工作区指令文件时 skill 是否被自发加载）
+- 洁净室：`C:\Users\sir_c\AppData\Local\Temp\mroute-cleanroom`（仅 `readme.txt` 20B，**无 AGENTS.md**，与工作区隔离）。
+- 派 2 个全新会话（`clean-1`/`clean-2`，assignee `zai-coding-cn/glm-5.3`，cwd=洁净室），prompt 中性、不提示任何工具或 skill。
+- 结果 **2/2**：两者均回 `SKILL_SEEN=mroute-dispatch`、`SKILL_LOADED=yes`、`PREFLIGHT=mroute_dispatch_plan`、`ASSIGNEE=zai-coding-cn/glm-5.3`（=清单首项）；产出 `out-c1.txt`（11B）、`out-c2.txt`（15B）均生成。
+- 判读：**不是靠工作区 AGENTS.md 驱动**（洁净室没有），说明「skill 路由 + 插件系统提示句 + 工具」三件套在陌生工作区也能闭环。
+
+### 21.4 多模型会话审计（`docs/09` + `plugin-mroute/devtools/audit-sessions.mjs`）
+- 脚本 949 行、零依赖、只读；**本审计最大技术坑 = `session.v4.jsonl.zstd` 是多帧拼接**，`zstdDecompressSync` 只解第一帧（某 258964B 文件只解出 276B），必须按 RFC 8878 逐帧切分（magic `0xFD2FB528`）。
+- 实测：95 会话 / **41799 事件** / 0 失败文件 / 1808ms。
+- 合规分类：compliant 11、compliant_fallback 3、preflight_late 1、no_preflight 2、deviation 3、unknown 0、no_dispatch 75。
+- **响应率 70.0%（14/20）**；查过推荐率 85.0%（17/20）；近 7 天 **76.5%（13/17，59 次派发）**。
+- 按模型族：glm 66.7%（12 有派发）、deepseek 75.0%（8 有派发）。
+- 预检工具分布：`mroute_dispatch_plan` 9 · `model_route_query` 8 · 未查 3；同渠道异模型 4 会话。
+- 异常：宿主策略门拒绝 **10 次 / 4 会话**（被拒路由固定为 `zai-coding-cn/glm-4.6`、`deepseek-official/deepseek-chat`、`deepseek-account/deepseek-chat`，被拒后一律「省略 assignee 继承父路由」而非换下一项）；`unknown tool` 16 次 / 6 会话（含 M4.8 的 schema 注册期）；mroute 工具自身报错 3 次 / 2 会话。
+- 结论解读（报告 §5.6）：未响应面主要不是「忘了查」，而是「查了但清单没被执行」；`mroute_dispatch_plan` **不写 decision log**（`lib/tool-dispatch-plan.js` 无写盘引用），审计只能依赖会话日志里的 tool_call 事件——已记为后续可改进点。
+
+### 21.5 git 与 GitHub（公开仓库）
+- `.gitignore`：排除 `tmp/`、`tmp-*`、`*.bak*`、`vendors/`、`gemini-eyes/`、`**/node_modules|dist|build|.venv|venv|release|out`、`*.tgz|zip|7z|zst`、二进制 `*.dll|*.node|*.so|*.dylib|*.exe|*.gif`、`plugin-orb-quota/packages/{helper/assets,voice/prebuilds}`、`.acl-recovery/`、`plugin-mroute/devtools/out/`。
+- 首次提交 **`fff65e6`**（conventional commit），749 files；`git init -b main` + `core.quotepath false`（中文文件名不转义）。
+- 远端：`https://github.com/orphiczhou/dsh-mroute`（**public**，REST `POST /user/repos` 创建），`git push -u origin main` 成功，`HEAD == origin/main == fff65e6`。
+- 首页 `README.md`：定位 / 为什么需要它 / 核心特性表 / 排序与判定口径 / 四个工具 / 设置面板 / skill / 会话审计（含实测数字表）/ 安装 / 仓库结构 / 文档索引 / 开发与自检 / 设计红线 / 环境坑 / 许可；`LICENSE` = MIT（附「上游 fork 保留原声明」说明）。
+
+### 21.6 凭据事件（须跟进）
+- 排查 GitHub 认证时，一次性把 `~/.git-credentials` 内容打到了控制台 —— 其中含明文 github token（`orphiczhou:gho_…`）。后续所有调用均从文件读取、**不再回显**。
+- 建议用户：①轮换该 token；②`credential.helper` 从 `store` 改为 `manager`（凭据进系统凭据库而非明文文件）。
