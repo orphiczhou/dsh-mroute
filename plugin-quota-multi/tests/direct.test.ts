@@ -1,0 +1,280 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { CATALOG_EXTRA, DIRECT_ADAPTERS, customHttpFetch, zhipuAccountItems } from '../src/direct.ts'
+
+const originalFetch = globalThis.fetch
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+}
+
+test.after(() => {
+  globalThis.fetch = originalFetch
+})
+
+test('openai-billing converts total_usage cents to dollars', async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    calls.push(url)
+    return url.endsWith('/subscription')
+      ? jsonResponse({ hard_limit_usd: 20 })
+      : jsonResponse({ total_usage: 350 })
+  }) as typeof fetch
+
+  const result = await customHttpFetch({ id: 'hub', label: 'Hub', endpoint: 'https://hub.example.com', keyRef: 'HUB_KEY', format: 'openai-billing' })('secret')
+
+  assert.deepEqual(calls, [
+    'https://hub.example.com/v1/dashboard/billing/subscription',
+    'https://hub.example.com/v1/dashboard/billing/usage',
+  ])
+  assert.equal(result.items[0]?.used, 3.5)
+  assert.equal(result.items[0]?.remaining, 16.5)
+  // display stays free of the remaining amount — the panel appends 剩{remaining} itself.
+  assert.equal(result.items[0]?.display, '$3.50 / $20.00')
+})
+
+test('openai-billing renders NewAPI unlimited-token sentinel without a fake limit', async () => {
+  globalThis.fetch = (async (input) => String(input).endsWith('/subscription')
+    ? jsonResponse({ hard_limit_usd: 100000000 })
+    : jsonResponse({ total_usage: 1692.5988 })) as typeof fetch
+
+  const result = await customHttpFetch({ id: 'hub', label: 'Hub', endpoint: 'https://hub.example.com', keyRef: 'HUB_KEY', format: 'openai-billing' })('secret')
+
+  assert.equal(result.items[0]?.percent, undefined)
+  assert.equal(result.items[0]?.display, '已用 $16.925988 · 无限额度')
+})
+
+test('newapi-account requests account quota with the required user header', async () => {
+  globalThis.fetch = (async (input, init) => {
+    assert.equal(String(input), 'https://newapi.example.com/api/user/self')
+    assert.deepEqual(init?.headers, {
+      Authorization: 'Bearer system-access-token',
+      'New-Api-User': '123',
+    })
+    return jsonResponse({ success: true, data: { quota: 18713632, used_quota: 1250000 } })
+  }) as typeof fetch
+
+  const result = await customHttpFetch({
+    id: 'account',
+    label: 'Account',
+    endpoint: 'https://newapi.example.com',
+    keyRef: 'NEWAPI_ACCESS_TOKEN',
+    format: 'newapi-account',
+    userId: '123',
+    quotaPerUnit: 500000,
+  })('system-access-token')
+
+  assert.deepEqual(result.items, [
+    { label: '账户余额 (USD)', display: '$37.427264' },
+    { label: '累计已用 (USD)', display: '$2.50' },
+  ])
+})
+
+test('newapi-account rejects a missing user id before sending a request', async () => {
+  let called = false
+  globalThis.fetch = (async () => {
+    called = true
+    return jsonResponse({})
+  }) as typeof fetch
+
+  const fetchQuota = customHttpFetch({ id: 'account', label: 'Account', endpoint: 'https://newapi.example.com', keyRef: 'NEWAPI_ACCESS_TOKEN', format: 'newapi-account' })
+  await assert.rejects(fetchQuota('system-access-token'), /userId must be a positive integer/)
+  assert.equal(called, false)
+})
+
+
+// ── 智谱：API key 查余额（/api/biz/account/query-customer-account-report） ──
+
+const zhipu = DIRECT_ADAPTERS.find((adapter) => adapter.id === 'zhipu')!
+
+test('zhipu API key renders the standard-API balance without a console login', async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    calls.push(`${url} ${String((init?.headers as Record<string, string> | undefined)?.Authorization)}`)
+    if (url.includes('/api/monitor/usage/quota/limit')) {
+      return jsonResponse({
+        code: 200,
+        data: {
+          planName: 'pro',
+          limits: [
+            { type: 'TOKENS_LIMIT', unit: 3, number: 5, percentage: 12, nextResetTime: 1793287132998 },
+            { type: 'TIME_LIMIT', usage: 1000, currentValue: 10, remaining: 990, percentage: 1 },
+          ],
+        },
+      })
+    }
+    if (url.includes('/api/biz/account/query-customer-account-report')) {
+      return jsonResponse({
+        code: 200,
+        data: {
+          balance: 0,
+          // 与余额同源：可用余额优先
+          availableBalance: 0,
+          rechargeAmount: 120,
+          giveAmount: 94.908478,
+          totalSpendAmount: 214.908478,
+          todaySpendAmount: null,
+          frozenBalance: 0,
+        },
+      })
+    }
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const snapshot = await zhipu.fetch('test-key')
+
+  assert.equal(snapshot.status, 'ok')
+  assert.deepEqual(snapshot.items, [
+    { label: '5 小时窗口', used: undefined, limit: undefined, remaining: undefined, percent: 12, display: '已用 12%', resetAt: new Date(1793287132998).toISOString() },
+    { label: '搜索/工具额度', used: 10, limit: 1000, remaining: 990, percent: 1, resetAt: undefined },
+    { label: '账户余额', display: '¥0' },
+    { label: '累计消费', display: '¥214.91' },
+  ])
+  // 余额走的是标准 API key，不是控制台 JWT
+  assert.match(calls[1] ?? '', /query-customer-account-report Bearer test-key/)
+})
+
+test('zhipu keeps the quota rows when the balance endpoint is forbidden', async () => {
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    if (url.includes('/api/monitor/usage/quota/limit')) {
+      return jsonResponse({ code: 200, data: { limits: [{ type: 'TOKENS_LIMIT', unit: 3, number: 5, percentage: 40 }] } })
+    }
+    return new Response('APIKey not allow access', { status: 403 })
+  }) as typeof fetch
+
+  const snapshot = await zhipu.fetch('test-key')
+  assert.equal(snapshot.status, 'ok')
+  assert.deepEqual(snapshot.items, [{ label: '5 小时窗口', used: undefined, limit: undefined, remaining: undefined, percent: 40, display: '已用 40%', resetAt: undefined }])
+})
+
+test('zhipuAccountItems prefers availableBalance and hides a zero today-spend', () => {
+  assert.deepEqual(
+    zhipuAccountItems({ data: { balance: 10, availableBalance: 5.5, totalSpendAmount: 0, todaySpendAmount: 0 } }),
+    [{ label: '账户余额', display: '¥5.5' }, { label: '累计消费', display: '¥0' }],
+  )
+  assert.deepEqual(
+    zhipuAccountItems({ balance: 7, totalSpendAmount: 214.908478, todaySpendAmount: 3.5 }),
+    [
+      { label: '账户余额', display: '¥7' },
+      { label: '累计消费', display: '¥214.91' },
+      { label: '今日消费', display: '¥3.5' },
+    ],
+  )
+  assert.deepEqual(zhipuAccountItems({ data: {} }), [])
+  assert.deepEqual(zhipuAccountItems(null), [])
+})
+
+test('zhipu adapter reads CREDIT_LIMIT windows (the Coding Plan meters credits, not tokens)', async () => {
+  globalThis.fetch = (async () => jsonResponse({
+    code: 200,
+    success: true,
+    data: {
+      limits: [
+        { type: 'CREDIT_LIMIT', unit: 3, number: 5, usage: 12000, currentValue: 9132, remaining: 2867, percentage: 76, nextResetTime: 1793184944153 },
+        { type: 'CREDIT_LIMIT', unit: 6, number: 1, usage: 60000, currentValue: 60017, remaining: 0, percentage: 100, nextResetTime: 1793603577964 },
+      ],
+      level: 'pro',
+    },
+  })) as typeof fetch
+
+  const snapshot = await zhipu.fetch('secret')
+
+  assert.equal(snapshot.status, 'ok')
+  assert.equal(snapshot.label, '智谱 Coding Plan · pro')
+  assert.deepEqual(snapshot.items, [
+    { label: '5 小时窗口', used: 9132, limit: 12000, remaining: 2867, percent: 76, display: '已用 76%', resetAt: '2026-10-28T10:55:44.153Z' },
+    { label: '本周窗口', used: 60017, limit: 60000, remaining: 0, percent: 100, display: '已用 100%', resetAt: '2026-11-02T07:12:57.964Z' },
+  ])
+})
+
+test('zhipu adapter still reads TOKENS_LIMIT windows', async () => {
+  globalThis.fetch = (async () => jsonResponse({
+    code: 200,
+    data: {
+      limits: [
+        { type: 'TOKENS_LIMIT', unit: 3, number: 5, usage: 12000, currentValue: 9132, remaining: 2867, percentage: 76, nextResetTime: 1793184944153 },
+      ],
+    },
+  })) as typeof fetch
+
+  const snapshot = await zhipu.fetch('secret')
+
+  assert.equal(snapshot.status, 'ok')
+  assert.equal(snapshot.items[0]?.label, '5 小时窗口')
+  assert.equal(snapshot.items[0]?.remaining, 2867)
+  assert.equal(snapshot.items[0]?.percent, 76)
+})
+
+test('zhipu adapter derives the percentage text when upstream omits percentage', async () => {
+  // 上游偶尔只给 currentValue/usage，不给 percentage。此时 display 必须用
+  // 兜底算出来的百分比，不能退化成「已用 ?%」。
+  globalThis.fetch = (async () => jsonResponse({
+    code: 200,
+    data: {
+      limits: [
+        { type: 'CREDIT_LIMIT', unit: 3, number: 5, usage: 12000, currentValue: 9132, remaining: 2867 },
+      ],
+    },
+  })) as typeof fetch
+
+  const snapshot = await zhipu.fetch('secret')
+
+  assert.equal(snapshot.status, 'ok')
+  assert.equal(snapshot.items[0]?.percent, 76.1)
+  assert.equal(snapshot.items[0]?.display, '已用 76%')
+})
+
+const minimax = CATALOG_EXTRA.find((a) => a.id === 'minimax-cn')!
+
+test('minimax adapter reports the 5h window and the weekly window', async () => {
+  globalThis.fetch = (async () => jsonResponse({
+    base_resp: { status_code: 0, status_msg: 'success' },
+    model_remains: [{
+      start_time: 1793167724570,
+      end_time: 1793185724570,
+      remains_time: 5580565,
+      current_interval_total_count: 0,
+      current_interval_usage_count: 0,
+      model_name: 'general',
+      current_weekly_total_count: 0,
+      current_weekly_usage_count: 0,
+      weekly_start_time: 1792910410812,
+      weekly_end_time: 1793515210812,
+      weekly_remains_time: 335066807,
+      current_interval_status: 1,
+      current_interval_remaining_percent: 65,
+      current_weekly_status: 1,
+      current_weekly_remaining_percent: 37,
+    }],
+  })) as typeof fetch
+
+  const snapshot = await minimax.fetch('secret')
+
+  assert.equal(snapshot.status, 'ok')
+  assert.deepEqual(snapshot.items, [
+    { label: '5h 窗口', percent: 35, display: '已用 35%', resetAt: '2026-10-28T11:08:44.570Z' },
+    { label: '本周窗口', percent: 63, display: '已用 63%', resetAt: '2026-11-01T06:40:10.812Z' },
+  ])
+})
+
+test('minimax adapter still reports the 5h window when the weekly fields are absent', async () => {
+  globalThis.fetch = (async () => jsonResponse({
+    base_resp: { status_code: 0, status_msg: 'success' },
+    model_remains: [{
+      end_time: 1793185724570,
+      current_interval_total_count: 12000,
+      current_interval_usage_count: 4000,
+      current_interval_remaining_percent: 65,
+    }],
+  })) as typeof fetch
+
+  const snapshot = await minimax.fetch('secret')
+
+  assert.equal(snapshot.status, 'ok')
+  assert.equal(snapshot.items.length, 1)
+  assert.equal(snapshot.items[0]?.label, '5h 窗口')
+  assert.equal(snapshot.items[0]?.percent, 35)
+})

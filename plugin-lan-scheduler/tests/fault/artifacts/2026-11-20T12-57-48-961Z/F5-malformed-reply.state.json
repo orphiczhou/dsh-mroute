@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "seq": 5,
+  "workers": [
+    {
+      "id": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "label": "dsh-b/ession-b",
+      "maxConcurrent": 1,
+      "status": "idle",
+      "currentTaskId": null,
+      "createdAt": "2026-11-20T12:57:49.119Z",
+      "lastSeen": "2026-11-20T12:57:49.127Z",
+      "lastDispatchedAt": "2026-11-20T12:57:49.127Z"
+    }
+  ],
+  "tasks": {
+    "t-mwozi7gj-2": {
+      "id": "t-mwozi7gj-2",
+      "title": "malformed",
+      "prompt": "malformed",
+      "priority": 0,
+      "status": "failed",
+      "attempts": 1,
+      "maxAttempts": 3,
+      "targetWorkerId": null,
+      "targetInstanceId": null,
+      "dedupeKey": null,
+      "ownerInstanceId": null,
+      "ownerSessionId": "session-a",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "createdAt": "2026-11-20T12:57:49.123Z",
+      "updatedAt": "2026-11-20T12:57:49.134Z",
+      "dispatchedAt": "2026-11-20T12:57:49.127Z",
+      "leaseUntil": null,
+      "leaseToken": null,
+      "finishedAt": "2026-11-20T12:57:49.134Z",
+      "nextAttemptAt": null,
+      "lastError": null,
+      "delivery": "followup",
+      "result": {
+        "summary": "",
+        "files": [],
+        "error": "worker-reported-failure"
+      },
+      "files": []
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-11-20T12:57:49.119Z",
+      "type": "worker-registered"
+    },
+    {
+      "at": "2026-11-20T12:57:49.123Z",
+      "type": "task-submitted"
+    },
+    {
+      "at": "2026-11-20T12:57:49.127Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwozi7gj-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    },
+    {
+      "at": "2026-11-20T12:57:49.131Z",
+      "type": "dispatch-delivered",
+      "taskId": "t-mwozi7gj-2",
+      "workerId": "w-1",
+      "delivery": "followup"
+    },
+    {
+      "at": "2026-11-20T12:57:49.134Z",
+      "type": "task-failed",
+      "taskId": "t-mwozi7gj-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+  <!-- mroute：按财务优先级排序的渠道清单（递减条）+ 降序箭头。原创图形，无背景块（Plugin Manager 自绘底板）。 -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 11.5 H27" stroke="#4E7E9B" stroke-width="3"/>
+    <path d="M7 18.5 H21" stroke="#4E7E9B" stroke-width="3" opacity="0.72"/>
+    <path d="M7 25.5 H15" stroke="#4E7E9B" stroke-width="3" opacity="0.45"/>
+    <path d="M31.5 9.5 V26" stroke="#B98148" stroke-width="2.6"/>
+    <path d="M27.9 22.4 L31.5 26 L35.1 22.4" stroke="#B98148" stroke-width="2.6"/>
+  </g>
+</svg>

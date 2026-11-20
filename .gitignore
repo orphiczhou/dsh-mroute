@@ -1,0 +1,45 @@
+# 临时与草稿（本地工作区产物，不入库）
+tmp/
+tmp-*
+*.tmp
+*.log
+*.bak
+*.bak-*
+*.m49bak
+*.m410bak
+*.orig
+
+# 第三方参考源码（体积大，索引见 mroute/vendors-manifest.json 与 README §4）
+vendors/
+
+# 独立仓库 / 大型媒体项目（自带 .git，单独维护）
+gemini-eyes/
+
+# 依赖与构建产物
+**/node_modules/
+**/dist/
+**/build/
+**/.venv/
+**/venv/
+**/release/
+**/out/
+**/*.tgz
+**/*.zip
+**/*.7z
+**/*.zst
+
+# 二进制与大媒体（避免把上游资产塞进仓库）
+**/*.dll
+**/*.node
+**/*.so
+**/*.dylib
+**/*.exe
+**/*.gif
+plugin-orb-quota/packages/helper/assets/
+plugin-orb-quota/packages/voice/prebuilds/
+
+# 机器特定状态
+.acl-recovery/
+
+# 审计/自测输出
+plugin-mroute/devtools/out/

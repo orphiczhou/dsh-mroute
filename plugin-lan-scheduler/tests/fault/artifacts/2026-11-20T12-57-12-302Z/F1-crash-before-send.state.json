@@ -1,0 +1,73 @@
+{
+  "version": 2,
+  "seq": 4,
+  "workers": [
+    {
+      "id": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "label": "dsh-b/ession-b",
+      "maxConcurrent": 1,
+      "status": "idle",
+      "currentTaskId": null,
+      "createdAt": "2026-11-20T12:57:12.312Z",
+      "lastSeen": "2026-11-20T12:57:12.321Z",
+      "lastDispatchedAt": "2026-11-20T12:57:12.321Z"
+    }
+  ],
+  "tasks": {
+    "t-mwozhf25-2": {
+      "id": "t-mwozhf25-2",
+      "title": "crash window",
+      "prompt": "crash window",
+      "priority": 0,
+      "status": "queued",
+      "attempts": 1,
+      "maxAttempts": 3,
+      "targetWorkerId": null,
+      "targetInstanceId": null,
+      "dedupeKey": null,
+      "ownerInstanceId": null,
+      "ownerSessionId": "session-a",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "createdAt": "2026-11-20T12:57:12.317Z",
+      "updatedAt": "2026-11-20T12:57:12.326Z",
+      "dispatchedAt": "2026-11-20T12:57:12.321Z",
+      "leaseUntil": null,
+      "leaseToken": null,
+      "finishedAt": null,
+      "nextAttemptAt": "2026-11-20T12:57:42.326Z",
+      "lastError": "recovered-dispatch",
+      "delivery": null,
+      "result": null,
+      "files": []
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-11-20T12:57:12.312Z",
+      "type": "worker-registered"
+    },
+    {
+      "at": "2026-11-20T12:57:12.317Z",
+      "type": "task-submitted"
+    },
+    {
+      "at": "2026-11-20T12:57:12.321Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwozhf25-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    },
+    {
+      "at": "2026-11-20T12:57:12.326Z",
+      "type": "dispatch-failed",
+      "taskId": "t-mwozhf25-2",
+      "workerId": "w-1",
+      "reason": "recovered-dispatch"
+    }
+  ]
+}

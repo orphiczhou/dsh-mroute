@@ -1,0 +1,172 @@
+/**
+ * Which decoder the one open microphone feeds.
+ * Host computes this from the ball's pin, the turn, the question card, playback,
+ * and whether each model is switched on and present. The child only applies it.
+ */
+
+import { hasWakeWord } from './settings.ts'
+
+export type ListenMode = 'off' | 'wake' | 'command' | 'interject'
+
+/** command 和 interject 都是「转写开着」。 */
+export function transcribing(mode: ListenMode): boolean {
+  return mode === 'command' || mode === 'interject'
+}
+
+export interface MicInput {
+  /** Wake switch is on. */
+  readonly wakeEnabled: boolean
+  /** Wake words; an empty list means the column cannot run. */
+  readonly wakeWords: readonly string[]
+  /** The wake model files are complete. */
+  readonly wakeModel: boolean
+  /** Voice-input switch is on. */
+  readonly commandEnabled: boolean
+  /** The official ASR model files are complete. */
+  readonly asrModel: boolean
+}
+
+/**
+ * Whether the child must hold the microphone at all. TTS never needs it; only a
+ * listening column that is switched on and has a complete model does. When both
+ * columns are off or unready, the device is released so macOS stops showing the
+ * microphone indicator.
+ */
+export function needsMicrophone(input: MicInput): boolean {
+  return (input.wakeEnabled && hasWakeWord(input.wakeWords) && input.wakeModel)
+    || (input.commandEnabled && input.asrModel)
+}
+
+export interface ListenInput {
+  /** The panel is pinned. Hover-open does not count. */
+  readonly pinned: boolean
+  /** The floating-ball agent is in a turn. */
+  readonly agentBusy: boolean
+  /**
+   * A selection-toolbar translation is streaming into the ball. It reads like an agent turn
+   * but is not one, and it must hold the microphone shut rather than opening it for an
+   * interjection: the user asked for a translation, not for a conversation.
+   */
+  readonly translationBusy?: boolean
+  /**
+   * A translation finished and the user has not asked for anything since. The ball is
+   * still pinned because it is showing the answer, but a translation is not a
+   * conversation: the command decoder stays shut and only the wake word is listened
+   * for, so the voice meter is gone until the user starts talking again on purpose.
+   */
+  readonly translationQuiet?: boolean
+  /** A question card is waiting for a click. */
+  readonly questionOpen: boolean
+  /** queue.bodyBusy */
+  readonly bodyBusy: boolean
+  /** queue.localBusy */
+  readonly localBusy: boolean
+  /** 停止或退下已经发出、执行还没真正停下 */
+  readonly stopping: boolean
+  /** Wake switch is on, the wake word is not empty, and the wake model files are complete. */
+  readonly wakeEnabled: boolean
+  /** Voice-input switch is on and the official ASR model files are complete. */
+  readonly commandEnabled: boolean
+  /** commandEnabled, and the interject keyword is not empty. */
+  readonly interjectEnabled: boolean
+  /** This capture of the child process includes echo cancellation. */
+  readonly echoCancel: boolean
+  /** The child process has the microphone. */
+  readonly micOpen: boolean
+}
+
+/**
+ * `off`, `wake`, `command`, or `interject`.
+ *
+ * A translation, a question card, a local reply, a stop that has not settled, or a closed
+ * microphone wins. A busy agent or agent body audio listens for an interjection
+ * when that column is on and, while body audio is playing, echo cancellation is
+ * present. Otherwise an unpinned ball listens for the wake word, and a pinned
+ * ball listens for a command — unless a finished translation is still on screen,
+ * which keeps the command decoder shut and listens for the wake word alone.
+ */
+export function listenMode(input: ListenInput): ListenMode {
+  // A translation closes the ears entirely, before the interjection branch can claim them.
+  if (input.translationBusy === true) return 'off'
+  if (input.questionOpen || input.localBusy || input.stopping || !input.micOpen) return 'off'
+  if (input.agentBusy || input.bodyBusy) {
+    if (!input.interjectEnabled) return 'off'
+    // 没有回声消除时，自己的播报会被转写进去。降级成正文播报期间不听。
+    if (input.bodyBusy && !input.echoCancel) return 'off'
+    return 'interject'
+  }
+  // A finished translation leaves its answer on a pinned ball without turning that
+  // ball into a conversation: the wake word is the only way back in. Both columns go
+  // through the same door, so a command-only setup stays quiet until the ball is
+  // unpinned and pinned again.
+  if (input.translationQuiet === true) return input.wakeEnabled ? 'wake' : 'off'
+  if (!input.pinned && input.wakeEnabled) return 'wake'
+  if (input.pinned && input.commandEnabled) return 'command'
+  return 'off'
+}
+
+export interface DeviceInput extends MicInput {
+  /** The panel is pinned. Hover-open does not count. */
+  readonly pinned: boolean
+  /** The floating-ball agent is in a turn. */
+  readonly agentBusy: boolean
+  /** A selection-toolbar translation is streaming; it asks for no decoder at all. */
+  readonly translationBusy?: boolean
+  /**
+   * A finished translation is on screen and the user has not asked for anything since.
+   * Only the wake word can be reached, whatever the pin says.
+   */
+  readonly translationQuiet?: boolean
+  /** A question card is waiting for a click. */
+  readonly questionOpen: boolean
+  /** queue.bodyBusy */
+  readonly bodyBusy: boolean
+  /** commandEnabled, and the interject keyword is not empty. */
+  readonly interjectEnabled: boolean
+  /** This capture of the child process includes echo cancellation. */
+  readonly echoCancel: boolean
+}
+
+/**
+ * 子进程要不要占着麦克风设备。
+ *
+ * 光看“哪一列开着”不够：唤醒只在收起时可达，语音输入只在固定时可达。只开唤醒
+ * 却把球固定，或只开语音输入却把球收起，当前固定状态没有任何解码器能跑，继续占
+ * 着设备只会让系统麦克风指示白亮。提问卡仍然一律放开。
+ *
+ * 执行中和播报中不看固定状态：只要插话这一列能跑（有语音输入、有关键词，
+ * 且正文播报时带回声消除），设备就要留着。回复、停止这类短暂的 off 不单独处理：
+ * 按同一套“当前固定状态有没有可达的列”判断，能恢复的列在就保持，不能恢复的就放开。
+ */
+export function holdsDevice(input: DeviceInput): boolean {
+  if (input.questionOpen) return false
+  // A translation wants no decoder, so the device is released and the system microphone
+  // indicator goes out for the few seconds the answer streams in.
+  if (input.translationBusy === true) return false
+  const wakeReady = input.wakeEnabled && hasWakeWord(input.wakeWords) && input.wakeModel
+  const commandReady = input.commandEnabled && input.asrModel
+  if (!wakeReady && !commandReady) return false
+  if (input.agentBusy || input.bodyBusy) {
+    if (!commandReady || !input.interjectEnabled) return false
+    // 没有回声消除时，正文播报期间不听，设备也不必占着。
+    if (input.bodyBusy && !input.echoCancel) return false
+    return true
+  }
+  // A finished translation leaves the ball pinned on its answer, but only the wake word
+  // can reach it: holding the device for the command column would light the system
+  // microphone indicator for a decoder that is not listening.
+  if (input.translationQuiet === true) return wakeReady
+  // 收起时只有唤醒可达，固定时只有语音输入可达。
+  return input.pinned ? commandReady : wakeReady
+}
+
+/**
+ * 子进程要不要用原生 VPIO 采集。
+ *
+ * VPIO 会压低整个系统输出，所以只在转写开着时用：`command` 只在面板固定时可达，
+ * `interject` 只在执行中或收尾播报把面板留住时可达，`wake` 就是收起状态。唤醒、
+ * 看视频、玩游戏这些时候走普通采集，系统音量不受影响。
+ */
+export function wantsNativeCapture(mode: ListenMode, useCpal: boolean, helper: boolean): boolean {
+  return transcribing(mode) && !useCpal && helper
+}

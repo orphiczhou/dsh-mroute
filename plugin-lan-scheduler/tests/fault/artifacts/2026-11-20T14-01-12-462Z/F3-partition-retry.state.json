@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "seq": 8,
+  "workers": [
+    {
+      "id": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "label": "dsh-b/ession-b",
+      "maxConcurrent": 1,
+      "status": "busy",
+      "currentTaskId": "t-mwp1rq7l-2",
+      "createdAt": "2026-11-20T14:01:12.555Z",
+      "lastSeen": "2026-11-20T14:01:12.584Z",
+      "lastDispatchedAt": "2026-11-20T14:01:12.584Z"
+    }
+  ],
+  "tasks": {
+    "t-mwp1rq7l-2": {
+      "id": "t-mwp1rq7l-2",
+      "title": "partition",
+      "prompt": "partition",
+      "priority": 0,
+      "status": "running",
+      "attempts": 3,
+      "maxAttempts": 3,
+      "targetWorkerId": null,
+      "targetInstanceId": null,
+      "dedupeKey": null,
+      "ownerInstanceId": null,
+      "ownerSessionId": "session-a",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "createdAt": "2026-11-20T14:01:12.561Z",
+      "updatedAt": "2026-11-20T14:01:12.590Z",
+      "dispatchedAt": "2026-11-20T14:01:12.584Z",
+      "leaseUntil": "2026-11-20T14:03:17.549Z",
+      "leaseToken": "lt-901ed947-cbae-4f8c-803c-a42ad17a7fd2",
+      "finishedAt": null,
+      "nextAttemptAt": null,
+      "lastError": null,
+      "delivery": "followup",
+      "result": null,
+      "files": []
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-11-20T14:01:12.555Z",
+      "type": "worker-registered"
+    },
+    {
+      "at": "2026-11-20T14:01:12.561Z",
+      "type": "task-submitted"
+    },
+    {
+      "at": "2026-11-20T14:01:12.566Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwp1rq7l-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    },
+    {
+      "at": "2026-11-20T14:01:12.571Z",
+      "type": "dispatch-failed",
+      "taskId": "t-mwp1rq7l-2",
+      "workerId": "w-1",
+      "reason": "ECONNREFUSED (injected transient partition)"
+    },
+    {
+      "at": "2026-11-20T14:01:12.577Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwp1rq7l-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 2
+    },
+    {
+      "at": "2026-11-20T14:01:12.581Z",
+      "type": "dispatch-failed",
+      "taskId": "t-mwp1rq7l-2",
+      "workerId": "w-1",
+      "reason": "ECONNREFUSED (injected transient partition)"
+    },
+    {
+      "at": "2026-11-20T14:01:12.584Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwp1rq7l-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 3
+    },
+    {
+      "at": "2026-11-20T14:01:12.590Z",
+      "type": "dispatch-delivered",
+      "taskId": "t-mwp1rq7l-2",
+      "workerId": "w-1",
+      "delivery": "followup"
+    }
+  ]
+}

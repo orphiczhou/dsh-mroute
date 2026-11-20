@@ -1,0 +1,1091 @@
+{
+  "generatedAt": "2026-11-20T14:01:12.751Z",
+  "artifactDir": "D:\\Codes\\DSH小插件\\plugin-lan-scheduler\\tests\\fault\\artifacts\\2026-11-20T14-01-12-462Z",
+  "scenarios": 8,
+  "passed": 8,
+  "failed": 0,
+  "results": [
+    {
+      "scenario": "F1-crash-before-send",
+      "pass": true,
+      "observed": {
+        "status": "queued",
+        "lastError": "recovered-dispatch",
+        "attempts": 1
+      },
+      "notes": [
+        "dispatch-started journaled, then process restarted before send"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rq5b-2",
+          "status": "queued",
+          "attempts": 1,
+          "leaseToken": null,
+          "workerId": "w-1",
+          "lastError": "recovered-dispatch",
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "idle",
+          "currentTaskId": null,
+          "createdAt": "2026-11-20T14:01:12.474Z",
+          "lastSeen": "2026-11-20T14:01:12.484Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.484Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 5,
+        "lastSeq": 4,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 4,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "idle",
+              "currentTaskId": null,
+              "createdAt": "2026-11-20T14:01:12.474Z",
+              "lastSeen": "2026-11-20T14:01:12.484Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.484Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rq5b-2": {
+              "id": "t-mwp1rq5b-2",
+              "title": "crash window",
+              "prompt": "crash window",
+              "priority": 0,
+              "status": "queued",
+              "attempts": 1,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.479Z",
+              "updatedAt": "2026-11-20T14:01:12.494Z",
+              "dispatchedAt": "2026-11-20T14:01:12.484Z",
+              "leaseUntil": null,
+              "leaseToken": null,
+              "finishedAt": null,
+              "nextAttemptAt": "2026-11-20T14:01:42.493Z",
+              "lastError": "recovered-dispatch",
+              "delivery": null,
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.474Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.480Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.484Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq5b-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.494Z",
+              "type": "dispatch-failed",
+              "taskId": "t-mwp1rq5b-2",
+              "workerId": "w-1",
+              "reason": "recovered-dispatch"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-crash-before-send-ytrcg0\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-crash-before-send-ytrcg0\\state.json"
+    },
+    {
+      "scenario": "F2-delivery-response-lost",
+      "pass": true,
+      "observed": {
+        "firstReason": "ECONNREFUSED (injected partition)",
+        "statusAfterFailure": "queued",
+        "statusAfterRetry": "running",
+        "tokensDiffer": true
+      },
+      "notes": [
+        "send threw after the worker may have received it; retry uses a new lease token"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rq6d-2",
+          "status": "running",
+          "attempts": 2,
+          "leaseToken": "lt-c416a76e-06dc-4f45-863d-80590887a002",
+          "workerId": "w-1",
+          "lastError": null,
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "busy",
+          "currentTaskId": "t-mwp1rq6d-2",
+          "createdAt": "2026-11-20T14:01:12.512Z",
+          "lastSeen": "2026-11-20T14:01:12.534Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.534Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 7,
+        "lastSeq": 6,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 6,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "busy",
+              "currentTaskId": "t-mwp1rq6d-2",
+              "createdAt": "2026-11-20T14:01:12.512Z",
+              "lastSeen": "2026-11-20T14:01:12.534Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.534Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rq6d-2": {
+              "id": "t-mwp1rq6d-2",
+              "title": "lost ack",
+              "prompt": "lost ack",
+              "priority": 0,
+              "status": "running",
+              "attempts": 2,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.517Z",
+              "updatedAt": "2026-11-20T14:01:12.539Z",
+              "dispatchedAt": "2026-11-20T14:01:12.534Z",
+              "leaseUntil": "2026-11-20T14:02:17.506Z",
+              "leaseToken": "lt-c416a76e-06dc-4f45-863d-80590887a002",
+              "finishedAt": null,
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": "followup",
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.513Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.517Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.524Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq6d-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.529Z",
+              "type": "dispatch-failed",
+              "taskId": "t-mwp1rq6d-2",
+              "workerId": "w-1",
+              "reason": "ECONNREFUSED (injected partition)"
+            },
+            {
+              "at": "2026-11-20T14:01:12.534Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq6d-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 2
+            },
+            {
+              "at": "2026-11-20T14:01:12.539Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rq6d-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-delivery-response-lost-zluC06\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-delivery-response-lost-zluC06\\state.json"
+    },
+    {
+      "scenario": "F3-partition-retry",
+      "pass": true,
+      "observed": {
+        "attempts": [
+          1,
+          2,
+          3
+        ],
+        "statuses": [
+          "queued",
+          "queued",
+          "running"
+        ],
+        "lastError": null
+      },
+      "notes": [
+        "two injected ECONNREFUSED, then success; retry budget consumed"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rq7l-2",
+          "status": "running",
+          "attempts": 3,
+          "leaseToken": "lt-901ed947-cbae-4f8c-803c-a42ad17a7fd2",
+          "workerId": "w-1",
+          "lastError": null,
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "busy",
+          "currentTaskId": "t-mwp1rq7l-2",
+          "createdAt": "2026-11-20T14:01:12.555Z",
+          "lastSeen": "2026-11-20T14:01:12.584Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.584Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 9,
+        "lastSeq": 8,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 8,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "busy",
+              "currentTaskId": "t-mwp1rq7l-2",
+              "createdAt": "2026-11-20T14:01:12.555Z",
+              "lastSeen": "2026-11-20T14:01:12.584Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.584Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rq7l-2": {
+              "id": "t-mwp1rq7l-2",
+              "title": "partition",
+              "prompt": "partition",
+              "priority": 0,
+              "status": "running",
+              "attempts": 3,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.561Z",
+              "updatedAt": "2026-11-20T14:01:12.590Z",
+              "dispatchedAt": "2026-11-20T14:01:12.584Z",
+              "leaseUntil": "2026-11-20T14:03:17.549Z",
+              "leaseToken": "lt-901ed947-cbae-4f8c-803c-a42ad17a7fd2",
+              "finishedAt": null,
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": "followup",
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.555Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.561Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.566Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq7l-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.571Z",
+              "type": "dispatch-failed",
+              "taskId": "t-mwp1rq7l-2",
+              "workerId": "w-1",
+              "reason": "ECONNREFUSED (injected transient partition)"
+            },
+            {
+              "at": "2026-11-20T14:01:12.577Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq7l-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 2
+            },
+            {
+              "at": "2026-11-20T14:01:12.581Z",
+              "type": "dispatch-failed",
+              "taskId": "t-mwp1rq7l-2",
+              "workerId": "w-1",
+              "reason": "ECONNREFUSED (injected transient partition)"
+            },
+            {
+              "at": "2026-11-20T14:01:12.584Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq7l-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 3
+            },
+            {
+              "at": "2026-11-20T14:01:12.590Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rq7l-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-partition-retry-5jIcbx\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-partition-retry-5jIcbx\\state.json"
+    },
+    {
+      "scenario": "F4-stale-reply",
+      "pass": true,
+      "observed": {
+        "firstToken": "lt-b3507fdf-080d-4d96-acaf-3b5d411c531a",
+        "secondToken": "lt-fb746730-0461-4c3c-979b-94c3d2c1d098",
+        "staleReason": "stale-lease",
+        "accepted": true,
+        "finalStatus": "succeeded"
+      },
+      "notes": [
+        "lease expired; old token rejected; current token accepted"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rq8y-2",
+          "status": "succeeded",
+          "attempts": 2,
+          "leaseToken": null,
+          "workerId": "w-1",
+          "lastError": null,
+          "result": {
+            "summary": "new lease wins",
+            "files": [],
+            "error": null
+          }
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "idle",
+          "currentTaskId": null,
+          "createdAt": "2026-11-20T14:01:12.605Z",
+          "lastSeen": "2026-11-20T14:01:12.627Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.627Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 9,
+        "lastSeq": 8,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 8,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "idle",
+              "currentTaskId": null,
+              "createdAt": "2026-11-20T14:01:12.605Z",
+              "lastSeen": "2026-11-20T14:01:12.627Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.627Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rq8y-2": {
+              "id": "t-mwp1rq8y-2",
+              "title": "fenced",
+              "prompt": "fenced",
+              "priority": 0,
+              "status": "succeeded",
+              "attempts": 2,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.610Z",
+              "updatedAt": "2026-11-20T14:01:12.637Z",
+              "dispatchedAt": "2026-11-20T14:01:12.627Z",
+              "leaseUntil": null,
+              "leaseToken": null,
+              "finishedAt": "2026-11-20T14:01:12.637Z",
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": "followup",
+              "result": {
+                "summary": "new lease wins",
+                "files": [],
+                "error": null
+              },
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.606Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.610Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.614Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq8y-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.618Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rq8y-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            },
+            {
+              "at": "2026-11-20T14:01:12.623Z",
+              "type": "lease-expired",
+              "taskId": "t-mwp1rq8y-2",
+              "reason": "lease-expired"
+            },
+            {
+              "at": "2026-11-20T14:01:12.627Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rq8y-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 2
+            },
+            {
+              "at": "2026-11-20T14:01:12.631Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rq8y-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            },
+            {
+              "at": "2026-11-20T14:01:12.637Z",
+              "type": "task-succeeded",
+              "taskId": "t-mwp1rq8y-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 2
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-stale-reply-7A8PyV\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-stale-reply-7A8PyV\\state.json"
+    },
+    {
+      "scenario": "F5-malformed-reply",
+      "pass": true,
+      "observed": {
+        "reason": "invalid-status",
+        "status": "running"
+      },
+      "notes": [
+        "non-JSON reply is rejected by invalid-status; the task is unchanged"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rqa9-2",
+          "status": "running",
+          "attempts": 1,
+          "leaseToken": "lt-059dce01-ce4d-46ff-9a20-1dfb494767b8",
+          "workerId": "w-1",
+          "lastError": null,
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "busy",
+          "currentTaskId": "t-mwp1rqa9-2",
+          "createdAt": "2026-11-20T14:01:12.652Z",
+          "lastSeen": "2026-11-20T14:01:12.661Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.661Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 5,
+        "lastSeq": 4,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 4,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "busy",
+              "currentTaskId": "t-mwp1rqa9-2",
+              "createdAt": "2026-11-20T14:01:12.652Z",
+              "lastSeen": "2026-11-20T14:01:12.661Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.661Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rqa9-2": {
+              "id": "t-mwp1rqa9-2",
+              "title": "malformed",
+              "prompt": "malformed",
+              "priority": 0,
+              "status": "running",
+              "attempts": 1,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.657Z",
+              "updatedAt": "2026-11-20T14:01:12.665Z",
+              "dispatchedAt": "2026-11-20T14:01:12.661Z",
+              "leaseUntil": "2026-11-20T14:01:17.665Z",
+              "leaseToken": "lt-059dce01-ce4d-46ff-9a20-1dfb494767b8",
+              "finishedAt": null,
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": "followup",
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.652Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.657Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.661Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rqa9-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.665Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rqa9-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-malformed-RPQ8E1\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-malformed-RPQ8E1\\state.json"
+    },
+    {
+      "scenario": "F6-oversized-reply",
+      "pass": true,
+      "observed": {
+        "reason": "reply-too-large",
+        "status": "running"
+      },
+      "notes": [
+        "1 MiB + 1 byte reply is rejected before JSON parsing"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rqb2-2",
+          "status": "running",
+          "attempts": 1,
+          "leaseToken": "lt-62151f48-87bb-45d6-9572-558b6d59331b",
+          "workerId": "w-1",
+          "lastError": null,
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "busy",
+          "currentTaskId": "t-mwp1rqb2-2",
+          "createdAt": "2026-11-20T14:01:12.680Z",
+          "lastSeen": "2026-11-20T14:01:12.690Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.690Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 5,
+        "lastSeq": 4,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 4,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "busy",
+              "currentTaskId": "t-mwp1rqb2-2",
+              "createdAt": "2026-11-20T14:01:12.680Z",
+              "lastSeen": "2026-11-20T14:01:12.690Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.690Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rqb2-2": {
+              "id": "t-mwp1rqb2-2",
+              "title": "oversized",
+              "prompt": "oversized",
+              "priority": 0,
+              "status": "running",
+              "attempts": 1,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.686Z",
+              "updatedAt": "2026-11-20T14:01:12.694Z",
+              "dispatchedAt": "2026-11-20T14:01:12.690Z",
+              "leaseUntil": "2026-11-20T14:01:17.694Z",
+              "leaseToken": "lt-62151f48-87bb-45d6-9572-558b6d59331b",
+              "finishedAt": null,
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": "followup",
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.680Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.686Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.690Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rqb2-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.694Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rqb2-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-oversized-yiPZlO\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-oversized-yiPZlO\\state.json"
+    },
+    {
+      "scenario": "F7-concurrent-tick",
+      "pass": true,
+      "observed": {
+        "samePromise": true,
+        "sends": 1,
+        "status": "running"
+      },
+      "notes": [
+        "tick() must be single-flight"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rqbt-2",
+          "status": "running",
+          "attempts": 1,
+          "leaseToken": "lt-1abf1997-b303-4b8e-a857-2b1c5d1d7fc9",
+          "workerId": "w-1",
+          "lastError": null,
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "busy",
+          "currentTaskId": "t-mwp1rqbt-2",
+          "createdAt": "2026-11-20T14:01:12.709Z",
+          "lastSeen": "2026-11-20T14:01:12.717Z",
+          "lastDispatchedAt": "2026-11-20T14:01:12.717Z"
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 5,
+        "lastSeq": 4,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 4,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "busy",
+              "currentTaskId": "t-mwp1rqbt-2",
+              "createdAt": "2026-11-20T14:01:12.709Z",
+              "lastSeen": "2026-11-20T14:01:12.717Z",
+              "lastDispatchedAt": "2026-11-20T14:01:12.717Z"
+            }
+          ],
+          "tasks": {
+            "t-mwp1rqbt-2": {
+              "id": "t-mwp1rqbt-2",
+              "title": "tick race",
+              "prompt": "tick race",
+              "priority": 0,
+              "status": "running",
+              "attempts": 1,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "createdAt": "2026-11-20T14:01:12.713Z",
+              "updatedAt": "2026-11-20T14:01:12.722Z",
+              "dispatchedAt": "2026-11-20T14:01:12.717Z",
+              "leaseUntil": "2026-11-20T14:01:17.721Z",
+              "leaseToken": "lt-1abf1997-b303-4b8e-a857-2b1c5d1d7fc9",
+              "finishedAt": null,
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": "followup",
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.709Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.713Z",
+              "type": "task-submitted"
+            },
+            {
+              "at": "2026-11-20T14:01:12.717Z",
+              "type": "dispatch-started",
+              "taskId": "t-mwp1rqbt-2",
+              "workerId": "w-1",
+              "instanceId": "dsh-b",
+              "attempt": 1
+            },
+            {
+              "at": "2026-11-20T14:01:12.722Z",
+              "type": "dispatch-delivered",
+              "taskId": "t-mwp1rqbt-2",
+              "workerId": "w-1",
+              "delivery": "followup"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-concurrent-tick-uhKWRb\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-concurrent-tick-uhKWRb\\state.json"
+    },
+    {
+      "scenario": "F8-journal-corruption",
+      "pass": true,
+      "observed": {
+        "tasks": 1,
+        "verify": {
+          "ok": true,
+          "events": 3,
+          "lastSeq": 2,
+          "error": null,
+          "replayed": {
+            "version": 2,
+            "seq": 2,
+            "workers": [
+              {
+                "id": "w-1",
+                "instanceId": "dsh-b",
+                "sessionId": "session-b",
+                "label": "dsh-b/ession-b",
+                "maxConcurrent": 1,
+                "status": "idle",
+                "currentTaskId": null,
+                "createdAt": "2026-11-20T14:01:12.735Z",
+                "lastSeen": "2026-11-20T14:01:12.735Z",
+                "lastDispatchedAt": null
+              }
+            ],
+            "tasks": {
+              "t-mwp1rqcj-2": {
+                "id": "t-mwp1rqcj-2",
+                "title": "durable",
+                "prompt": "durable",
+                "priority": 0,
+                "status": "queued",
+                "attempts": 0,
+                "maxAttempts": 3,
+                "targetWorkerId": null,
+                "targetInstanceId": null,
+                "dedupeKey": null,
+                "ownerInstanceId": null,
+                "ownerSessionId": "session-a",
+                "workerId": null,
+                "instanceId": null,
+                "sessionId": null,
+                "createdAt": "2026-11-20T14:01:12.739Z",
+                "updatedAt": "2026-11-20T14:01:12.739Z",
+                "dispatchedAt": null,
+                "leaseUntil": null,
+                "leaseToken": null,
+                "finishedAt": null,
+                "nextAttemptAt": null,
+                "lastError": null,
+                "delivery": null,
+                "result": null,
+                "files": []
+              }
+            },
+            "audit": [
+              {
+                "at": "2026-11-20T14:01:12.735Z",
+                "type": "worker-registered"
+              },
+              {
+                "at": "2026-11-20T14:01:12.739Z",
+                "type": "task-submitted"
+              }
+            ]
+          }
+        }
+      },
+      "notes": [
+        "state.json corrupt + incomplete journal tail; replay survives"
+      ],
+      "tasks": [
+        {
+          "id": "t-mwp1rqcj-2",
+          "status": "queued",
+          "attempts": 0,
+          "leaseToken": null,
+          "workerId": null,
+          "lastError": null,
+          "result": null
+        }
+      ],
+      "workers": [
+        {
+          "id": "w-1",
+          "instanceId": "dsh-b",
+          "sessionId": "session-b",
+          "label": "dsh-b/ession-b",
+          "maxConcurrent": 1,
+          "status": "idle",
+          "currentTaskId": null,
+          "createdAt": "2026-11-20T14:01:12.735Z",
+          "lastSeen": "2026-11-20T14:01:12.735Z",
+          "lastDispatchedAt": null
+        }
+      ],
+      "verify": {
+        "ok": true,
+        "events": 3,
+        "lastSeq": 2,
+        "error": null,
+        "replayed": {
+          "version": 2,
+          "seq": 2,
+          "workers": [
+            {
+              "id": "w-1",
+              "instanceId": "dsh-b",
+              "sessionId": "session-b",
+              "label": "dsh-b/ession-b",
+              "maxConcurrent": 1,
+              "status": "idle",
+              "currentTaskId": null,
+              "createdAt": "2026-11-20T14:01:12.735Z",
+              "lastSeen": "2026-11-20T14:01:12.735Z",
+              "lastDispatchedAt": null
+            }
+          ],
+          "tasks": {
+            "t-mwp1rqcj-2": {
+              "id": "t-mwp1rqcj-2",
+              "title": "durable",
+              "prompt": "durable",
+              "priority": 0,
+              "status": "queued",
+              "attempts": 0,
+              "maxAttempts": 3,
+              "targetWorkerId": null,
+              "targetInstanceId": null,
+              "dedupeKey": null,
+              "ownerInstanceId": null,
+              "ownerSessionId": "session-a",
+              "workerId": null,
+              "instanceId": null,
+              "sessionId": null,
+              "createdAt": "2026-11-20T14:01:12.739Z",
+              "updatedAt": "2026-11-20T14:01:12.739Z",
+              "dispatchedAt": null,
+              "leaseUntil": null,
+              "leaseToken": null,
+              "finishedAt": null,
+              "nextAttemptAt": null,
+              "lastError": null,
+              "delivery": null,
+              "result": null,
+              "files": []
+            }
+          },
+          "audit": [
+            {
+              "at": "2026-11-20T14:01:12.735Z",
+              "type": "worker-registered"
+            },
+            {
+              "at": "2026-11-20T14:01:12.739Z",
+              "type": "task-submitted"
+            }
+          ]
+        }
+      },
+      "journalFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-journal-corruption-AApW1n\\state.journal.jsonl",
+      "stateFile": "C:\\Users\\sir_c\\AppData\\Local\\Temp\\lan-sched-fault-journal-corruption-AApW1n\\state.json"
+    }
+  ]
+}

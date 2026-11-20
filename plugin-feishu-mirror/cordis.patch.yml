@@ -1,0 +1,15 @@
+# dsh-feishu-mirror bundle patch: mounts the session-mirror fork into the
+# profile under a unique plugin id. The upstream @aiwayds/dsh-feishu bundle
+# must be disabled while this fork is enabled (both open a Feishu WebSocket
+# with the same app credentials; Lark long-connection mode does not broadcast).
+
+- insert:
+    - id: dsh-feishu-mirror
+      name: '@local/dsh-feishu-mirror'
+      config:
+        mode: on
+        mirrorMode: group
+        mirrorGroupPrefix: DSH
+        operators:
+          - ou_6cfded525e9b85bc9e944ea0cabe6900
+        # domain: feishu        # feishu | lark

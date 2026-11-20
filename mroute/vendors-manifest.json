@@ -1,0 +1,308 @@
+﻿[
+    {
+        "name":  "dsh-quota-panel",
+        "owner":  "wenzetan",
+        "npm":  "dsh-quota-panel",
+        "version":  "0.1.7-rc.1-v0.1",
+        "url":  "https://github.com/wenzetan/dsh-quota-panel",
+        "category":  "usage",
+        "stars":  12
+    },
+    {
+        "name":  "dsh-aliyun-balance",
+        "owner":  "wai549077",
+        "npm":  "dsh-aliyun-balance",
+        "version":  "0.1.4",
+        "url":  "https://github.com/wai549077/dsh-aliyun-balance",
+        "category":  "usage",
+        "stars":  12
+    },
+    {
+        "name":  "dsh-qwen-balance",
+        "owner":  "yanlijin",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/yanlijin/dsh-qwen-balance",
+        "category":  "usage",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-balance-monitor",
+        "owner":  "ConTr0L0",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/ConTr0L0/dsh-balance-monitor",
+        "category":  "usage",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-balance-monitor",
+        "owner":  "ShawnKung",
+        "npm":  "@shawnkung/dsh-balance-monitor",
+        "version":  "0.2.3",
+        "url":  "https://github.com/ShawnKung/dsh-balance-monitor",
+        "category":  "usage",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-musage",
+        "owner":  "Thedeergod666",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/Thedeergod666/dsh-musage",
+        "category":  "usage",
+        "stars":  6
+    },
+    {
+        "name":  "dsh-llm-fallbacks",
+        "owner":  "omdsh-dev",
+        "npm":  "dsh-llm-fallbacks",
+        "version":  "0.8.6",
+        "url":  "https://github.com/omdsh-dev/dsh-llm-fallbacks",
+        "category":  "model",
+        "stars":  26
+    },
+    {
+        "name":  "dsh-delegate-router",
+        "owner":  "penguin-oo",
+        "npm":  "dsh-delegate-router",
+        "version":  "0.4.5",
+        "url":  "https://github.com/penguin-oo/dsh-delegate-router",
+        "category":  "model",
+        "stars":  2
+    },
+    {
+        "name":  "dsh-autotier",
+        "owner":  "PerryLink",
+        "npm":  "dsh-autotier",
+        "version":  "0.2.21",
+        "url":  "https://github.com/PerryLink/dsh-autotier",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-quota-takeover",
+        "owner":  "puppy-bai",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/puppy-bai/dsh-quota-takeover",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-llm-governor",
+        "owner":  "young-tim",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/young-tim/dsh-llm-governor",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-teammate-model-picker",
+        "owner":  "wufeng0105",
+        "npm":  "@wufeng0105/dsh-teammate-model-picker",
+        "version":  "0.3.2",
+        "url":  "https://github.com/wufeng0105/dsh-teammate-model-picker",
+        "category":  "model",
+        "stars":  0
+    },
+    {
+        "name":  "dsh-subagent-custom",
+        "owner":  "xingzhen199186",
+        "npm":  "dsh-subagent-custom",
+        "version":  "0.1.1",
+        "url":  "https://github.com/xingzhen199186/dsh-subagent-custom",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-subagent-setup",
+        "owner":  "twoweeks1995",
+        "npm":  "dsh-subagent-setup",
+        "version":  "0.2.2",
+        "url":  "https://github.com/twoweeks1995/dsh-subagent-setup",
+        "category":  "model",
+        "stars":  0
+    },
+    {
+        "name":  "dsh-plugin-subagent-director",
+        "owner":  "SeverusZh",
+        "npm":  "dsh-plugin-subagent-director",
+        "version":  "0.6.0",
+        "url":  "https://github.com/SeverusZh/dsh-plugin-subagent-director",
+        "category":  "model",
+        "stars":  24
+    },
+    {
+        "name":  "dsh-subagent-route-pin",
+        "owner":  "tkaiz0406",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/tkaiz0406/dsh-subagent-route-pin",
+        "category":  "model",
+        "stars":  2
+    },
+    {
+        "name":  "dsh-model-master",
+        "owner":  "NEETnina",
+        "npm":  "dsh-model-master",
+        "version":  "1.1.2",
+        "url":  "https://github.com/NEETnina/dsh-model-master",
+        "category":  "model",
+        "stars":  19
+    },
+    {
+        "name":  "dsh-model-health",
+        "owner":  "oxlyn",
+        "npm":  "dsh-model-health",
+        "version":  "0.2.20",
+        "url":  "https://github.com/oxlyn/dsh-model-health",
+        "category":  "model",
+        "stars":  3
+    },
+    {
+        "name":  "dsh-model-connection-test",
+        "owner":  "Willmylife",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/Willmylife/dsh-model-connection-test",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-agent-bench",
+        "owner":  "songrui111",
+        "npm":  "dsh-agent-bench",
+        "version":  "0.1.1",
+        "url":  "https://github.com/songrui111/dsh-agent-bench",
+        "category":  "dev",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-big-coming",
+        "owner":  "Sumcam-L",
+        "npm":  "dsh-big-coming",
+        "version":  "0.1.1",
+        "url":  "https://github.com/Sumcam-L/dsh-big-coming",
+        "category":  "fun",
+        "stars":  0
+    },
+    {
+        "name":  "dsh-swarm-router",
+        "owner":  "r600a-code",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/r600a-code/dsh-swarm-router",
+        "category":  "model",
+        "stars":  3
+    },
+    {
+        "name":  "dsh-freemodels-opencode",
+        "owner":  "xiean676",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/xiean676/dsh-freemodels-opencode",
+        "category":  "model",
+        "stars":  0
+    },
+    {
+        "name":  "dsh-plugin-hub#packages/dsh-provider-usage",
+        "owner":  "wingsky-1",
+        "npm":  "@wingsky-1/dsh-provider-usage",
+        "version":  "0.2.11",
+        "url":  "https://github.com/wingsky-1/dsh-plugin-hub/tree/main/packages/dsh-provider-usage",
+        "category":  "usage",
+        "stars":  32
+    },
+    {
+        "name":  "dsh-model-router",
+        "owner":  "Alice-Marx",
+        "npm":  "@ljwei-stak/dsh-model-route-bot",
+        "version":  "0.69.0",
+        "url":  "https://github.com/Alice-Marx/dsh-model-router",
+        "category":  "model",
+        "stars":  959
+    },
+    {
+        "name":  "DSH-model-router",
+        "owner":  "bill277048-hash",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/bill277048-hash/DSH-model-router",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-model-router",
+        "owner":  "ebluffy",
+        "npm":  "dsh-model-router-en",
+        "version":  "0.14.9",
+        "url":  "https://github.com/ebluffy/dsh-model-router",
+        "category":  "model",
+        "stars":  1
+    },
+    {
+        "name":  "dsh-model-router",
+        "owner":  "Neptune810",
+        "npm":  "@neptune810/dsh-model-router",
+        "version":  "1.1.2",
+        "url":  "https://github.com/Neptune810/dsh-model-router",
+        "category":  "model",
+        "stars":  4
+    },
+    {
+        "name":  "dsh-model-router",
+        "owner":  "superboy911",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/superboy911/dsh-model-router",
+        "category":  "model",
+        "stars":  4
+    },
+    {
+        "name":  "dsh-model-router",
+        "owner":  "welsione",
+        "npm":  "@welsione/dsh-model-router",
+        "version":  "0.0.10",
+        "url":  "https://github.com/welsione/dsh-model-router",
+        "category":  "model",
+        "stars":  2
+    },
+    {
+        "name":  "dsh-model-router",
+        "owner":  "yunxiao11xie",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/yunxiao11xie/dsh-model-router",
+        "category":  "tools",
+        "stars":  0
+    },
+    {
+        "name":  "dsh-eval-harness",
+        "owner":  "LTJ002",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/LTJ002/dsh-eval-harness",
+        "category":  "skill",
+        "stars":  0
+    },
+    {
+        "name":  "dsh-eval-harness",
+        "owner":  "BiBoyang",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/BiBoyang/dsh-eval-harness",
+        "category":  "dev",
+        "stars":  14
+    },
+    {
+        "name":  "dsh-eval-harness#dsh-eval-harness",
+        "owner":  "LeoGoat2004",
+        "npm":  null,
+        "version":  null,
+        "url":  "https://github.com/LeoGoat2004/dsh-eval-harness/tree/main/dsh-eval-harness/packages/dsh-eval-harness",
+        "category":  "dev",
+        "stars":  0
+    }
+]

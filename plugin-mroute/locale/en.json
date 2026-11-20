@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Model route advisor",
+    "description": "Ranks model channels by finance-first priority (monthly > voucher > prepaid) with capability tiers, fallback chains, manual notes and machine balances read via the quota plugin. Query the model_route_query tool before dispatching subagents; the Model routing settings section lets you edit the channel registry and parameters, applied immediately. Advisory-only: suggests without blocking; the final choice stays with the session and the user."
+  }
+}

@@ -1,0 +1,18 @@
+# The dsh-quota-multi bundle patch: mounts the quota plugin (host tools + HTTP
+# API + shell.overlay bottom-right pill and panel) alongside the profile's
+# bundles. Fork of Minokun/dsh-quota 0.14.10 adding the Xiaomi MiMo adapter.
+#
+# NOTE: keep the insert id `quota` so this fork replaces the upstream bundle
+# cleanly. Do NOT install it alongside upstream dsh-quota@0.14.10 — the bundle
+# id and the `quota` settings namespace would collide.
+#
+# Optional composition config (settings namespace `quota`), e.g.:
+#
+# - id: quota
+#   config:
+#     refreshOnBoot: true
+#     refreshIntervalMinutes: 30
+
+- insert:
+    - id: quota
+      name: 'dsh-quota-multi'

@@ -1,0 +1,89 @@
+{
+  "audit": "PASS",
+  "checkedAt": "2026-11-20T12:58:32.540Z",
+  "artifactDir": "D:\\Codes\\DSH小插件\\plugin-lan-scheduler\\tests\\fault\\artifacts\\2026-11-20T12-58-09-828Z",
+  "scenarios": 8,
+  "failures": [],
+  "checks": [
+    {
+      "scenario": "F1-crash-before-send",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 5,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F2-delivery-response-lost",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 7,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F3-partition-retry",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 9,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F4-stale-reply",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 9,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F5-malformed-reply",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 6,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F6-oversized-reply",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 5,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F7-concurrent-tick",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 5,
+        "truncated": false
+      }
+    },
+    {
+      "scenario": "F8-journal-corruption",
+      "pass": true,
+      "verify": true,
+      "journal": {
+        "ok": true,
+        "events": 3,
+        "truncated": false
+      }
+    }
+  ]
+}

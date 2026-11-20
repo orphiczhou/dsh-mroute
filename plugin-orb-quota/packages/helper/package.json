@@ -1,0 +1,31 @@
+{
+  "name": "@dsh-orb/helper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Transparent always-on-top ball. A separate Electron process owned by the official dsh host.",
+  "main": "lib/main.js",
+  "exports": {
+    ".": "./lib/main.js",
+    "./package.json": "./package.json",
+    "./preload.cjs": "./preload.cjs",
+    "./selection-preload.cjs": "./selection-preload.cjs"
+  },
+  "files": [
+    "lib",
+    "preload.cjs",
+    "selection-preload.cjs",
+    "lasso-preload.cjs",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsdown && pnpm build:vendor",
+    "build:vendor": "tsdown --config tsdown.vendor.config.ts && node ./scripts/vendor-katex-assets.mjs"
+  },
+  "devDependencies": {
+    "@shikijs/langs": "^4.3.1",
+    "katex": "^0.16.47",
+    "shiki": "^4.3.1"
+  },
+  "license": "MIT"
+}

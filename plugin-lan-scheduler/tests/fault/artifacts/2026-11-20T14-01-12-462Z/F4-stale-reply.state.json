@@ -1,0 +1,106 @@
+{
+  "version": 2,
+  "seq": 8,
+  "workers": [
+    {
+      "id": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "label": "dsh-b/ession-b",
+      "maxConcurrent": 1,
+      "status": "idle",
+      "currentTaskId": null,
+      "createdAt": "2026-11-20T14:01:12.605Z",
+      "lastSeen": "2026-11-20T14:01:12.627Z",
+      "lastDispatchedAt": "2026-11-20T14:01:12.627Z"
+    }
+  ],
+  "tasks": {
+    "t-mwp1rq8y-2": {
+      "id": "t-mwp1rq8y-2",
+      "title": "fenced",
+      "prompt": "fenced",
+      "priority": 0,
+      "status": "succeeded",
+      "attempts": 2,
+      "maxAttempts": 3,
+      "targetWorkerId": null,
+      "targetInstanceId": null,
+      "dedupeKey": null,
+      "ownerInstanceId": null,
+      "ownerSessionId": "session-a",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "createdAt": "2026-11-20T14:01:12.610Z",
+      "updatedAt": "2026-11-20T14:01:12.637Z",
+      "dispatchedAt": "2026-11-20T14:01:12.627Z",
+      "leaseUntil": null,
+      "leaseToken": null,
+      "finishedAt": "2026-11-20T14:01:12.637Z",
+      "nextAttemptAt": null,
+      "lastError": null,
+      "delivery": "followup",
+      "result": {
+        "summary": "new lease wins",
+        "files": [],
+        "error": null
+      },
+      "files": []
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-11-20T14:01:12.606Z",
+      "type": "worker-registered"
+    },
+    {
+      "at": "2026-11-20T14:01:12.610Z",
+      "type": "task-submitted"
+    },
+    {
+      "at": "2026-11-20T14:01:12.614Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwp1rq8y-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    },
+    {
+      "at": "2026-11-20T14:01:12.618Z",
+      "type": "dispatch-delivered",
+      "taskId": "t-mwp1rq8y-2",
+      "workerId": "w-1",
+      "delivery": "followup"
+    },
+    {
+      "at": "2026-11-20T14:01:12.623Z",
+      "type": "lease-expired",
+      "taskId": "t-mwp1rq8y-2",
+      "reason": "lease-expired"
+    },
+    {
+      "at": "2026-11-20T14:01:12.627Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwp1rq8y-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 2
+    },
+    {
+      "at": "2026-11-20T14:01:12.631Z",
+      "type": "dispatch-delivered",
+      "taskId": "t-mwp1rq8y-2",
+      "workerId": "w-1",
+      "delivery": "followup"
+    },
+    {
+      "at": "2026-11-20T14:01:12.637Z",
+      "type": "task-succeeded",
+      "taskId": "t-mwp1rq8y-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 2
+    }
+  ]
+}

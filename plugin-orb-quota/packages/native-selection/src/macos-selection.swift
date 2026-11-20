@@ -1,0 +1,604 @@
+import AppKit
+import ApplicationServices
+import CoreGraphics
+import Darwin
+import Foundation
+
+/// In-process selection monitor for the Host process.
+/// Host is Node on the main thread and does not run a Cocoa loop, so events arrive on a
+/// private CFRunLoop via a listen-only CGEventTap. This file must not change the activation policy.
+
+private let minDragPixels: CGFloat = 8
+private let readDelayNs: UInt64 = 100_000_000
+
+private func selectionEventCallback(
+  _ proxy: CGEventTapProxy,
+  _ type: CGEventType,
+  _ event: CGEvent,
+  _ userInfo: UnsafeMutableRawPointer?,
+) -> Unmanaged<CGEvent>? {
+  if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+    if let userInfo {
+      let monitor = Unmanaged<SelectionMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+      if let tap = monitor.eventTap {
+        CGEvent.tapEnable(tap: tap, enable: true)
+      }
+    }
+    return Unmanaged.passUnretained(event)
+  }
+  if let userInfo {
+    let monitor = Unmanaged<SelectionMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+    monitor.handle(type: type, event: event)
+  }
+  return Unmanaged.passUnretained(event)
+}
+
+private final class SelectionMonitor: @unchecked Sendable {
+  private let lock = NSLock()
+  private var excludePids: Set<pid_t> = [pid_t(getpid())]
+  private var press: CGPoint?
+  private var dragged = false
+  private var frontPid: pid_t = 0
+  /**
+   * Whether the toolbar is on screen. Nothing but the events that would dismiss it needs to
+   * cross the pipe while it is hidden, which is the overwhelmingly common case.
+   */
+  private var toolbarVisible = false
+  /** Processes whose accessibility tree has already been asked to turn on. */
+  private var accessibilityAsked: Set<pid_t> = []
+  private var readFd: Int32 = -1
+  private var writeFd: Int32 = -1
+  private var thread: Thread?
+  private var runLoop: CFRunLoop?
+  fileprivate var eventTap: CFMachPort?
+  private var stopping = false
+
+  func outputReadFd() -> Int32 {
+    lock.lock()
+    let fd = readFd
+    lock.unlock()
+    return fd
+  }
+
+  func start() {
+    lock.lock()
+    if thread != nil {
+      lock.unlock()
+      return
+    }
+    var fds = [Int32](repeating: 0, count: 2)
+    guard pipe(&fds) == 0 else {
+      lock.unlock()
+      emit(["type": "untrusted"])
+      return
+    }
+    readFd = fds[0]
+    writeFd = fds[1]
+    _ = fcntl(readFd, F_SETFD, FD_CLOEXEC)
+    _ = fcntl(writeFd, F_SETFD, FD_CLOEXEC)
+    _ = fcntl(writeFd, F_SETFL, O_NONBLOCK)
+    stopping = false
+    let started = Thread { [weak self] in
+      self?.run()
+    }
+    started.name = "dsh-orb-selection"
+    thread = started
+    lock.unlock()
+    started.start()
+  }
+
+  func stop() {
+    lock.lock()
+    stopping = true
+    let loop = runLoop
+    let tap = eventTap
+    let write = writeFd
+    writeFd = -1
+    lock.unlock()
+    if let tap {
+      CGEvent.tapEnable(tap: tap, enable: false)
+    }
+    if let loop {
+      CFRunLoopStop(loop)
+    }
+    if write >= 0 {
+      close(write)
+    }
+    lock.lock()
+    thread = nil
+    eventTap = nil
+    runLoop = nil
+    readFd = -1
+    lock.unlock()
+    press = nil
+    dragged = false
+    lock.lock()
+    accessibilityAsked.removeAll()
+    lock.unlock()
+  }
+
+  func lastFrontPid() -> pid_t {
+    lock.lock()
+    let pid = frontPid
+    let excluded = excludePids
+    lock.unlock()
+    if pid <= 0 || excluded.contains(pid) { return 0 }
+    return pid
+  }
+
+  func setExcludePids(_ pids: Set<pid_t>) {
+    lock.lock()
+    excludePids = pids
+    lock.unlock()
+  }
+
+  func setToolbarVisible(_ visible: Bool) {
+    lock.lock()
+    toolbarVisible = visible
+    lock.unlock()
+  }
+
+  func activatePid(_ pid: pid_t) {
+    lock.lock()
+    let excluded = excludePids
+    lock.unlock()
+    if excluded.contains(pid) { return }
+    guard let application = NSRunningApplication(processIdentifier: pid), !application.isTerminated else {
+      return
+    }
+    if #available(macOS 14.0, *) {
+      _ = application.activate()
+    } else {
+      _ = application.activate(options: [.activateIgnoringOtherApps])
+    }
+  }
+
+  private func run() {
+    let trusted = AXIsProcessTrustedWithOptions([
+      kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false,
+    ] as CFDictionary)
+    rememberFront(NSWorkspace.shared.frontmostApplication)
+    let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+      self?.rememberFront(NSWorkspace.shared.frontmostApplication)
+    }
+    RunLoop.current.add(timer, forMode: .common)
+    if !trusted {
+      emit(["type": "untrusted"])
+      emit(["type": "ready"])
+      lock.lock()
+      runLoop = CFRunLoopGetCurrent()
+      let shouldStop = stopping
+      lock.unlock()
+      if !shouldStop {
+        CFRunLoopRun()
+      }
+      timer.invalidate()
+      return
+    }
+    let mask = eventMask()
+    let userInfo = Unmanaged.passUnretained(self).toOpaque()
+    guard let tap = CGEvent.tapCreate(
+      tap: .cgSessionEventTap,
+      place: .headInsertEventTap,
+      options: .listenOnly,
+      eventsOfInterest: mask,
+      callback: selectionEventCallback,
+      userInfo: userInfo,
+    ) else {
+      emit(["type": "untrusted"])
+      emit(["type": "ready"])
+      lock.lock()
+      runLoop = CFRunLoopGetCurrent()
+      let shouldStop = stopping
+      lock.unlock()
+      if !shouldStop { CFRunLoopRun() }
+      timer.invalidate()
+      return
+    }
+    lock.lock()
+    eventTap = tap
+    runLoop = CFRunLoopGetCurrent()
+    let shouldStop = stopping
+    lock.unlock()
+    let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+    CGEvent.tapEnable(tap: tap, enable: true)
+    emit(["type": "ready"])
+    if !shouldStop {
+      CFRunLoopRun()
+    }
+    timer.invalidate()
+    CGEvent.tapEnable(tap: tap, enable: false)
+  }
+
+  private func eventMask() -> CGEventMask {
+    let types: [CGEventType] = [
+      .leftMouseDown, .leftMouseUp, .leftMouseDragged,
+      .rightMouseDown, .otherMouseDown, .scrollWheel, .keyDown,
+    ]
+    return types.reduce(0) { mask, type in
+      mask | (CGEventMask(1) << type.rawValue)
+    }
+  }
+
+  fileprivate func handle(type: CGEventType, event: CGEvent) {
+    let location = event.location
+    let point = (x: Double(location.x), y: Double(location.y))
+    // A hidden toolbar only needs the click that may raise one. Anything else — a drag, a
+    // scroll, a keystroke — can only dismiss a toolbar that does not exist, and sending it
+    // would be one cross-process write per keystroke while the user types.
+    lock.lock()
+    let visible = toolbarVisible
+    lock.unlock()
+    // A hidden toolbar still needs the whole press-drag-release gesture: `dragged` is only
+    // ever set from a drag event, and it is what decides whether the release reads a
+    // selection at all. So the gesture is always tracked; only its *reports* are gated.
+    guard visible || type == .leftMouseDown || type == .leftMouseUp || type == .leftMouseDragged else {
+      return
+    }
+    switch type {
+    case .leftMouseDown:
+      press = location
+      dragged = false
+      emit(["type": "mouse-down", "x": point.x, "y": point.y])
+      // Chromium apps build no accessibility tree until a client asks for one, and the ask
+      // takes about two seconds to take effect. Start it as the press lands, off the tap
+      // thread, so the next selection in that app reads normally.
+      DispatchQueue.global(qos: .utility).async { [weak self] in
+        self?.requestAccessibilityUnder(point: CGPoint(x: point.x, y: point.y))
+      }
+    case .leftMouseDragged:
+      if let origin = press {
+        let dx = location.x - origin.x
+        let dy = location.y - origin.y
+        if hypot(dx, dy) >= minDragPixels { dragged = true }
+      }
+      // The drag itself is only bookkeeping: it exists so the release knows this was a drag
+      // rather than a click. A visible toolbar does not need it either — the pointer that
+      // dismisses the bar is a fresh mouse-down and a scroll reports itself.
+    case .leftMouseUp:
+      // A double- or triple-click selects a word or paragraph without moving the pointer,
+      // so the click count counts as a selection too; a lone click still reads nothing.
+      let clickCount = event.getIntegerValueField(.mouseEventClickState)
+      let shouldRead = press != nil && (dragged || clickCount >= 2)
+      press = nil
+      dragged = false
+      emit(["type": "mouse-up", "x": point.x, "y": point.y])
+      if shouldRead {
+        DispatchQueue.global(qos: .userInitiated).async {
+          self.readSelection(anchor: point)
+        }
+      }
+    case .rightMouseDown, .otherMouseDown:
+      emit(["type": "dismiss"])
+    case .scrollWheel:
+      if event.getIntegerValueField(.scrollWheelEventMomentumPhase) != 0 { return }
+      let dx = event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2)
+      let dy = event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
+      if dx == 0 && dy == 0 { return }
+      emit(["type": "dismiss"])
+    case .keyDown:
+      emit(["type": "key"])
+    default:
+      break
+    }
+  }
+
+  private func rememberFront(_ application: NSRunningApplication?) {
+    guard let pid = application?.processIdentifier, pid > 0 else { return }
+    lock.lock()
+    if !excludePids.contains(pid) {
+      frontPid = pid
+    }
+    lock.unlock()
+  }
+
+  private func readSelection(anchor: (x: Double, y: Double)) {
+    usleep(useconds_t(readDelayNs / 1_000))
+    lock.lock()
+    let excluded = excludePids
+    lock.unlock()
+    // The window under the release is the application the user selected in. AppKit's
+    // "frontmost" is not usable from this process: the Host runs as a child of the app, and
+    // `NSWorkspace.frontmostApplication` answers `com.deepseek.dsh` — the app itself — even
+    // while the browser is in front, so every read targeted the wrong application, found no
+    // selection, and the toolbar never appeared.
+    var pid = appUnderPoint(CGPoint(x: anchor.x, y: anchor.y), excluding: excluded)
+    if pid == nil, let front = NSWorkspace.shared.frontmostApplication,
+      !excluded.contains(front.processIdentifier),
+      front.bundleIdentifier != Bundle.main.bundleIdentifier {
+      // A release outside every app window (a full-screen overlay closed mid-drag, say).
+      // This fallback is only for that case and never picks our own application.
+      pid = front.processIdentifier
+    }
+    guard let pid else { return }
+    let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+    // Accessibility only. The old clipboard fallback posted a synthetic ⌘C whenever AX had
+    // nothing to offer and then restored the pasteboard by writing back a single string,
+    // which silently destroyed any image or rich text the user had copied; it also fired
+    // into password fields and terminals. Reporting no selection is the cheaper mistake.
+    guard let ax = readAccessibility(frontPid: pid) else {
+      // Nothing came back; if this is a Chromium app whose tree is still off, ask now so the
+      // next selection in it works.
+      requestAccessibility(pid: pid)
+      return
+    }
+    emitSelection(
+      text: ax.text,
+      bounds: ax.bounds,
+      pid: pid,
+      bundle: bundle,
+      x: anchor.x,
+      y: anchor.y,
+    )
+  }
+
+  /**
+   * The application that owns the frontmost normal window containing `point`.
+   *
+   * The WindowServer's list is ordered front to back — the stacking order the user actually
+   * sees — and layer 0 is the app windows, so the menu bar, the Dock, and our own
+   * always-on-top chrome are all out of the way. The app itself and the helper are dropped
+   * by `excluding` plus the bundle comparison, which keeps a selection inside the main
+   * window from raising a toolbar.
+   */
+  /**
+   * Ask the app under `point` to turn its accessibility tree on.
+   *
+   * Chromium (Chrome, VS Code, Slack) keeps `kAXFocusedUIElement` at kAXErrorNoValue until a
+   * client asks: setting `AXEnhancedUserInterface` gets kAXErrorNotImplemented back and the
+   * tree comes up about two seconds later. Electron apps take `AXManualAccessibility`, so
+   * both are set — an unsupported one is ignored. Once per process is enough.
+   */
+  private func requestAccessibilityUnder(point: CGPoint) {
+    lock.lock()
+    let excluded = excludePids
+    lock.unlock()
+    if let pid = appUnderPoint(point, excluding: excluded) { requestAccessibility(pid: pid) }
+  }
+
+  private func requestAccessibility(pid: pid_t) {
+    lock.lock()
+    let first = accessibilityAsked.insert(pid).inserted
+    lock.unlock()
+    if !first { return }
+    let application = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(application, 0.5)
+    _ = AXUIElementSetAttributeValue(
+      application,
+      "AXEnhancedUserInterface" as CFString,
+      kCFBooleanTrue,
+    )
+    _ = AXUIElementSetAttributeValue(
+      application,
+      "AXManualAccessibility" as CFString,
+      kCFBooleanTrue,
+    )
+  }
+
+  private func appUnderPoint(_ point: CGPoint, excluding: Set<pid_t>) -> pid_t? {
+    guard let windows = CGWindowListCopyWindowInfo(
+      [.optionOnScreenOnly, .excludeDesktopElements],
+      kCGNullWindowID,
+    ) as? [[String: Any]] else { return nil }
+    for window in windows {
+      guard (window[kCGWindowLayer as String] as? Int) == 0,
+        let pid = window[kCGWindowOwnerPID as String] as? pid_t,
+        !excluding.contains(pid),
+        NSRunningApplication(processIdentifier: pid)?.bundleIdentifier != Bundle.main.bundleIdentifier,
+        let bounds = window[kCGWindowBounds as String] as? [String: Any],
+        let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+        frame.contains(point)
+      else { continue }
+      return pid
+    }
+    return nil
+  }
+
+  private func emitSelection(
+    text: String,
+    bounds: CGRect?,
+    pid: pid_t?,
+    bundle: String?,
+    x: Double? = nil,
+    y: Double? = nil,
+  ) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty { return }
+    var payload: [String: Any] = ["type": "selection", "text": trimmed]
+    if let pid { payload["pid"] = Int(pid) }
+    if let bundle { payload["bundle"] = bundle }
+    if let bounds { payload["bounds"] = electronRect(bounds) }
+    if let x { payload["x"] = x }
+    if let y { payload["y"] = y }
+    emit(payload)
+  }
+
+  private func emit(_ payload: [String: Any]) {
+    guard JSONSerialization.isValidJSONObject(payload),
+      let data = try? JSONSerialization.data(withJSONObject: payload),
+      var line = String(data: data, encoding: .utf8)
+    else { return }
+    line += "\n"
+    lock.lock()
+    let fd = writeFd
+    let emitC = libraryEmit.emit
+    let context = libraryEmit.context
+    lock.unlock()
+    if fd >= 0 {
+      line.withCString { pointer in
+        _ = Darwin.write(fd, pointer, strlen(pointer))
+      }
+    }
+    if let emitC {
+      line.dropLast().withCString { emitC($0, context) }
+    }
+  }
+}
+
+/**
+ * The element with keyboard focus, asked of the frontmost application itself.
+ *
+ * The system-wide element's `kAXFocusedUIElement` is not dependable: on macOS 26 it answers
+ * `kAXErrorCannotComplete` (-25204) for the whole machine, so every read returned nothing and
+ * the toolbar never appeared for a selection that was plainly there. Asking the application
+ * for its own focused element works on that machine and is what other selection tools do; the
+ * system-wide element stays as a fallback for an app that only reports focus there.
+ *
+ * The messaging timeout is short because this runs off the tap: a hung target must not make
+ * the next few selections queue behind it.
+ */
+private func focusedElement(frontPid: pid_t?) -> AXUIElement? {
+  if let pid = frontPid, pid > 0 {
+    let application = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(application, 0.5)
+    if let focused = copyFocusedElement(application) { return focused }
+  }
+  let system = AXUIElementCreateSystemWide()
+  AXUIElementSetMessagingTimeout(system, 0.5)
+  return copyFocusedElement(system)
+}
+
+private func copyFocusedElement(_ root: AXUIElement) -> AXUIElement? {
+  var focused: CFTypeRef?
+  let error = AXUIElementCopyAttributeValue(root, kAXFocusedUIElementAttribute as CFString, &focused)
+  guard error == .success, let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
+  return (focused as! AXUIElement)
+}
+
+private func readAccessibility(frontPid: pid_t?) -> (text: String, bounds: CGRect?)? {
+  guard let element = focusedElement(frontPid: frontPid) else { return nil }
+  var selected: CFTypeRef?
+  let selectedError = AXUIElementCopyAttributeValue(
+    element,
+    kAXSelectedTextAttribute as CFString,
+    &selected,
+  )
+  guard selectedError == .success, let text = selected as? String else { return nil }
+  let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+  if trimmed.isEmpty { return nil }
+  var rangeValue: CFTypeRef?
+  let rangeError = AXUIElementCopyAttributeValue(
+    element,
+    kAXSelectedTextRangeAttribute as CFString,
+    &rangeValue,
+  )
+  var bounds: CGRect?
+  // The range and its rectangle are casts into AXValue; check the type before casting so a
+  // misbehaving app cannot crash the Host with a bad attribute value.
+  if rangeError == .success, let raw = rangeValue, CFGetTypeID(raw) == AXValueGetTypeID() {
+    let range = raw as! AXValue
+    var cfRange = CFRange()
+    if AXValueGetValue(range, .cfRange, &cfRange), cfRange.length <= 0 { return nil }
+    var boundsValue: CFTypeRef?
+    let boundsError = AXUIElementCopyParameterizedAttributeValue(
+      element,
+      kAXBoundsForRangeParameterizedAttribute as CFString,
+      range,
+      &boundsValue,
+    )
+    if boundsError == .success, let rawBounds = boundsValue, CFGetTypeID(rawBounds) == AXValueGetTypeID() {
+      var rect = CGRect.zero
+      if AXValueGetValue(rawBounds as! AXValue, .cgRect, &rect) { bounds = rect }
+    }
+  }
+  return (trimmed, bounds)
+}
+
+/**
+ * An accessibility bounds rectangle, unchanged.
+ *
+ * `kAXBoundsForRange` already speaks the same top-left, y-down screen space Electron and
+ * CGWindowBounds use — verified by reading both for the same window — so converting it a
+ * second time put the toolbar on the opposite half of the screen.
+ */
+private func electronRect(_ cocoa: CGRect) -> [String: Double] {
+  return [
+    "x": Double(cocoa.origin.x),
+    "y": Double(cocoa.origin.y),
+    "width": Double(cocoa.size.width),
+    "height": Double(cocoa.size.height),
+  ]
+}
+
+public typealias DshSelectionEmit = @convention(c) (UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Void
+
+private final class LibraryEmit: @unchecked Sendable {
+  let lock = NSLock()
+  var emit: DshSelectionEmit?
+  var context: UnsafeMutableRawPointer?
+}
+
+private let libraryEmit = LibraryEmit()
+private var libraryMonitor: SelectionMonitor?
+
+@_cdecl("dsh_macos_selection_start")
+public func dsh_macos_selection_start(
+  callback: DshSelectionEmit?,
+  context: UnsafeMutableRawPointer?,
+) -> Int32 {
+  libraryEmit.lock.lock()
+  libraryEmit.emit = callback
+  libraryEmit.context = context
+  libraryEmit.lock.unlock()
+  if libraryMonitor == nil { libraryMonitor = SelectionMonitor() }
+  libraryMonitor?.start()
+  return 0
+}
+
+@_cdecl("dsh_macos_selection_read_fd")
+public func dsh_macos_selection_read_fd() -> Int32 {
+  libraryMonitor?.outputReadFd() ?? -1
+}
+
+@_cdecl("dsh_macos_selection_stop")
+public func dsh_macos_selection_stop() {
+  libraryMonitor?.stop()
+  libraryMonitor = nil
+  libraryEmit.lock.lock()
+  libraryEmit.emit = nil
+  libraryEmit.context = nil
+  libraryEmit.lock.unlock()
+}
+
+@_cdecl("dsh_macos_selection_exclude_pids")
+public func dsh_macos_selection_exclude_pids(_ pids: UnsafePointer<CChar>?) {
+  var next: Set<pid_t> = [pid_t(getpid())]
+  if let pids {
+    for part in String(cString: pids).split(separator: ",") {
+      if let value = Int32(part.trimmingCharacters(in: .whitespaces)) {
+        next.insert(pid_t(value))
+      }
+    }
+  }
+  libraryMonitor?.setExcludePids(next)
+}
+
+@_cdecl("dsh_macos_selection_activate_pid")
+public func dsh_macos_selection_activate_pid(_ pid: Int32) {
+  libraryMonitor?.activatePid(pid_t(pid))
+}
+
+/// Tell the monitor whether the toolbar is on screen, so a hidden bar costs no event traffic.
+@_cdecl("dsh_macos_selection_set_toolbar_visible")
+public func dsh_macos_selection_set_toolbar_visible(_ visible: Int32) {
+  libraryMonitor?.setToolbarVisible(visible != 0)
+}
+
+@_cdecl("dsh_macos_selection_last_front_pid")
+public func dsh_macos_selection_last_front_pid() -> Int32 {
+  libraryMonitor?.lastFrontPid() ?? 0
+}
+
+@_cdecl("dsh_macos_selection_prompt")
+public func dsh_macos_selection_prompt() -> Int32 {
+  let trusted = AXIsProcessTrustedWithOptions([
+    kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true,
+  ] as CFDictionary)
+  return trusted ? 1 : 0
+}
+
+@_cdecl("dsh_macos_selection_trusted")
+public func dsh_macos_selection_trusted() -> Int32 {
+  AXIsProcessTrusted() ? 1 : 0
+}

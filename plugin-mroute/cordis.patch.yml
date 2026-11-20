@@ -1,0 +1,6 @@
+# mroute bundle：insert 一行 Host row（模板形态，见 asar skills/dsh-doc/templates/decoration/cordis.patch.yml）。
+# 种子注册表（5 provider）由 Config schema 的 channels default 承载，见 lib/config-schema.js；此处不重复内联。
+- insert:
+    - id: mroute
+      name: '@local/dsh-plugin-mroute'
+      config: {}

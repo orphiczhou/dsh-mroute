@@ -1,0 +1,73 @@
+{
+  "version": 2,
+  "seq": 4,
+  "workers": [
+    {
+      "id": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "label": "dsh-b/ession-b",
+      "maxConcurrent": 1,
+      "status": "busy",
+      "currentTaskId": "t-mwp0o90w-2",
+      "createdAt": "2026-11-20T13:30:30.700Z",
+      "lastSeen": "2026-11-20T13:30:30.707Z",
+      "lastDispatchedAt": "2026-11-20T13:30:30.707Z"
+    }
+  ],
+  "tasks": {
+    "t-mwp0o90w-2": {
+      "id": "t-mwp0o90w-2",
+      "title": "tick race",
+      "prompt": "tick race",
+      "priority": 0,
+      "status": "running",
+      "attempts": 1,
+      "maxAttempts": 3,
+      "targetWorkerId": null,
+      "targetInstanceId": null,
+      "dedupeKey": null,
+      "ownerInstanceId": null,
+      "ownerSessionId": "session-a",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "createdAt": "2026-11-20T13:30:30.704Z",
+      "updatedAt": "2026-11-20T13:30:30.710Z",
+      "dispatchedAt": "2026-11-20T13:30:30.707Z",
+      "leaseUntil": "2026-11-20T13:30:35.710Z",
+      "leaseToken": "lt-fd5974cd-c6c6-4869-85c1-9e441b81458c",
+      "finishedAt": null,
+      "nextAttemptAt": null,
+      "lastError": null,
+      "delivery": "followup",
+      "result": null,
+      "files": []
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-11-20T13:30:30.700Z",
+      "type": "worker-registered"
+    },
+    {
+      "at": "2026-11-20T13:30:30.704Z",
+      "type": "task-submitted"
+    },
+    {
+      "at": "2026-11-20T13:30:30.707Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwp0o90w-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    },
+    {
+      "at": "2026-11-20T13:30:30.710Z",
+      "type": "dispatch-delivered",
+      "taskId": "t-mwp0o90w-2",
+      "workerId": "w-1",
+      "delivery": "followup"
+    }
+  ]
+}

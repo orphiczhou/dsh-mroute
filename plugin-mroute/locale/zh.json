@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "模型路由参考",
+    "description": "按财务优先级（monthly > voucher > prepaid）排序模型渠道，含能力分层、备选链、人工登记与机读余额（经 quota 插件读取）。派遣子会话前先调用 model_route_query 工具查询；设置面板「模型路由」分区可可视化编辑渠道注册表与参数，保存后立即生效。advisory-only：只建议不阻断，最终选择权在会话与用户。"
+  }
+}

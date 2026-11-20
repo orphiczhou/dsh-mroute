@@ -1,0 +1,4 @@
+# dsh-lan-scheduler bundle patch: mount the scheduler host plugin.
+- insert:
+    - id: lan-scheduler
+      name: '@local/dsh-lan-scheduler'

@@ -1,0 +1,88 @@
+{
+  "version": 2,
+  "seq": 6,
+  "workers": [
+    {
+      "id": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "label": "dsh-b/ession-b",
+      "maxConcurrent": 1,
+      "status": "busy",
+      "currentTaskId": "t-mwozpiv4-2",
+      "createdAt": "2026-11-20T13:03:30.492Z",
+      "lastSeen": "2026-11-20T13:03:30.509Z",
+      "lastDispatchedAt": "2026-11-20T13:03:30.509Z"
+    }
+  ],
+  "tasks": {
+    "t-mwozpiv4-2": {
+      "id": "t-mwozpiv4-2",
+      "title": "lost ack",
+      "prompt": "lost ack",
+      "priority": 0,
+      "status": "running",
+      "attempts": 2,
+      "maxAttempts": 3,
+      "targetWorkerId": null,
+      "targetInstanceId": null,
+      "dedupeKey": null,
+      "ownerInstanceId": null,
+      "ownerSessionId": "session-a",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "sessionId": "session-b",
+      "createdAt": "2026-11-20T13:03:30.496Z",
+      "updatedAt": "2026-11-20T13:03:30.513Z",
+      "dispatchedAt": "2026-11-20T13:03:30.509Z",
+      "leaseUntil": "2026-11-20T13:04:35.462Z",
+      "leaseToken": "lt-29278399-4ad1-42ca-ab92-be94ea08c640",
+      "finishedAt": null,
+      "nextAttemptAt": "2026-11-20T13:04:00.462Z",
+      "lastError": null,
+      "delivery": "followup",
+      "result": null,
+      "files": []
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-11-20T13:03:30.492Z",
+      "type": "worker-registered"
+    },
+    {
+      "at": "2026-11-20T13:03:30.496Z",
+      "type": "task-submitted"
+    },
+    {
+      "at": "2026-11-20T13:03:30.500Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwozpiv4-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 1
+    },
+    {
+      "at": "2026-11-20T13:03:30.505Z",
+      "type": "dispatch-failed",
+      "taskId": "t-mwozpiv4-2",
+      "workerId": "w-1",
+      "reason": "ECONNREFUSED (injected partition)"
+    },
+    {
+      "at": "2026-11-20T13:03:30.509Z",
+      "type": "dispatch-started",
+      "taskId": "t-mwozpiv4-2",
+      "workerId": "w-1",
+      "instanceId": "dsh-b",
+      "attempt": 2
+    },
+    {
+      "at": "2026-11-20T13:03:30.513Z",
+      "type": "dispatch-delivered",
+      "taskId": "t-mwozpiv4-2",
+      "workerId": "w-1",
+      "delivery": "followup"
+    }
+  ]
+}
