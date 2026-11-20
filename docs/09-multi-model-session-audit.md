@@ -8,7 +8,7 @@
 
 **结论摘要**
 
-1. **响应率 70.0%（14/20）**：本工作区 20 个会话派过子会话（或试过），其中 14 个在派发前查过 mroute 推荐且首个成功派发落在清单内；近 7 天为 **76.5%（13/17）**。
+1. **响应率 70.0%（14/20）**：本工作区 20 个会话派过子会话（或试过），其中 14 个在派发前查过 mroute 推荐且首个成功派发落在清单内；近 7 天窗口（`--since 2026-11-13T14:00:00Z`，70 会话）为 **77.8%（14/18）**。
 2. 未响应面主要不是「忘了查」，而是「查了但清单没被执行」：deviation 3 个（会话沿用自身默认路由）、no_preflight 2 个、preflight_late 1 个。
 3. 宿主策略门是本工作区唯一真实的「硬门」：**10 次拒绝 / 4 个会话**，被拒路由固定为 `zai-coding-cn/glm-4.6`、`deepseek-official/deepseek-chat`、`deepseek-account/deepseek-chat`；被拒后行为均为**省略 assignee 继承父路由**，而非按清单换下一项。
 4. 新工具 `mroute_dispatch_plan`（M4.11 工具 B）已被 9 个会话使用，其中 25666cbb 是「取清单 → 按第 3 位派发」的正面样本；但 `mroute_dispatch_plan` **不像 `model_route_query` 那样写决策日志**，审计只能依赖会话日志里的 tool_call 事件（见 §1.6、§6）。
@@ -44,7 +44,7 @@ DSH 的 slug 形态是「路径分隔符 → `-`，非 ASCII 字符 → `~XXXX~`
 
 - 实测：某 258964 字节文件整包解压只得到 276 字节（第一帧内容），后续帧被静默丢弃。
 - 正确做法：按 RFC 8878 的帧头逐帧切分（magic `0xFD2FB528` 小端、FCS 字段标志、单段标志、校验和标志、字典标志、RLE block 只占 1 字节），对每帧单独解压再拼接。
-- 实测：54 帧全部成功 → 848926 字节 / 112 行；95 个会话共 **41799 事件、0 坏帧**（单文件失败只记 warning，不中断）。
+- 实测：54 帧全部成功 → 848926 字节 / 112 行；95 个会话共 **4.2 万事件（首次 41799 / 复跑 42469）、0 坏帧**（单文件失败只记 warning，不中断）。
 - 兜底：若手工切帧失败，就在 buffer 里搜下一个 `28 B5 2F FD` magic 继续，避免整体放弃。
 
 ### 1.4 事件结构（实证）
@@ -88,8 +88,8 @@ DSH 的 slug 形态是「路径分隔符 → `-`，非 ASCII 字符 → `~XXXX~`
 | 指标 | 数值 |
 |---|---|
 | 扫描会话 | 95 / 盘上 95（失败文件 0） |
-| 事件总数 | 41799 |
-| 耗时 | 1808 ms（流式单遍） |
+| 事件总数 | 41799（首次全量运行；含被审计的本次审计会话自身，复跑会略增） |
+| 耗时 | 1.8~2.1 s（单遍流式，95 会话） |
 | slug 目录（全局） | 26 |
 | 有派发调用的会话 | 20（占 21.1%） |
 | 派发尝试 | 92（成功 76 / 失败 16） |
@@ -126,17 +126,19 @@ DSH 的 slug 形态是「路径分隔符 → `-`，非 ASCII 字符 → `~XXXX~`
 
 **响应率 = (compliant + compliant_fallback) / 有派发 = 14 / 20 = 70.0%**；查过推荐率 = 17 / 20 = **85.0%**。
 
-### 3.2 近 7 天（cutoff = 运行时刻 − 7×24h，本次约 2026-11-13T14:08Z）
+### 3.2 近 7 天窗口（cutoff 固定为 `2026-11-13T14:00:00Z`，≈ 审计运行时刻 − 7×24h，用 `--since` 保证可复现）
 
 | 指标 | 数值 |
 |---|---|
-| 会话 | 68 |
-| 有派发 | 17 |
-| 派发尝试 | 59 |
-| compliant + fallback | 11 + 2 = 13 |
-| **响应率** | **76.5%（13/17）** |
-| 派发前查过推荐 | 15 / 17 = **88.2%** |
-| 分类 | compliant 11 · fallback 2 · no_preflight 2 · deviation 2 |
+| 会话 | 70 |
+| 有派发 | 18 |
+| 派发尝试 | 63 |
+| compliant + fallback | 11 + 3 = 14 |
+| **响应率** | **77.8%（14/18）** |
+| 派发前查过推荐 | 16 / 18 = **88.9%** |
+| 分类 | compliant 11 · fallback 3 · no_preflight 2 · deviation 2 |
+
+说明：`--days 7` 的 cutoff 会随运行时刻滑动（复跑结果略变）；报告数字用 `--since` 固定窗口，命令见 §7。滑动窗口下本次复跑约为 62~70 会话、16~18 个有派发，响应率 75.0%~77.8%，量级一致。
 
 ### 3.3 按模型族（主模型族，只看有派发会话）
 
@@ -205,9 +207,9 @@ pwsh 1978 · read 1966 · edit 1081 · grep 541 · write 281 · plugin_manager 1
 - 关键时间线：
   1. 22:12:42 `model_route_query`（清单只解析出 rank1 `zai-coding-cn`）；
   2. 22:17:41 `subagent` **省略 assignee** → 继承 `glmflash-free/GLM-5.3-Flash-Thinking`（子 `08492e22`，首个成功）；
-  3. 次日 02:58:04 / 02:59:20 显式 `opencode-go/deepseek-v4.1-flash`（`b89daae9`、`2ca3d3e5`）；02:59:42 显式 `deepseek-official/deepseek-v4-pro`（`05fdf62c`）；
-  4. 03:07:18 继承 `zai-coding-cn/glm-5.3`（`5b0322d9`，终于落到清单渠道）；
-  5. 05:13:17 `opencode-go/qwen3.8-flash`（`9c90c4eb`）、05:13:58 `deepseek-official/deepseek-v4-pro`（`b1f63ad7`）。
+  3. 次日（11-14）10:58:04 / 10:59:20 显式 `opencode-go/deepseek-v4.1-flash`（`b89daae9`、`2ca3d3e5`）；10:59:42 显式 `deepseek-official/deepseek-v4-pro`（`05fdf62c`）；
+  4. 11:07:18 继承 `zai-coding-cn/glm-5.3`（`5b0322d9`，终于落到清单渠道）；
+  5. 13:13:17 `opencode-go/qwen3.8-flash`（`9c90c4eb`）、13:13:58 `deepseek-official/deepseek-v4-pro`（`b1f63ad7`）。
 - 判定：查过清单，但首个成功派发沿用了自身默认渠道（glmflash-free），落 `deviation`。它后续确实出现过清单渠道，说明「查到清单」与「改派发」之间仍缺一步显式指令。
 
 ---
@@ -262,11 +264,12 @@ pwsh 1978 · read 1966 · edit 1081 · grep 541 · write 281 · plugin_manager 1
 1. **`mroute_dispatch_plan` 不写决策日志**：决策日志只有 `model_route_query` 的记录且无 session id，因此本报告的「查过推荐」全部来自会话日志的 `tool/call` 事件，无法与决策侧 `top3` 对账，也无法知道用户是否在设置面板改过渠道顺序后立即重试。
 2. **父子关联是启发式**：`parentSession` + 120s 时间窗；9 个未关联子会话（tree-engine 竹节接力）只能标 `unlinked`，故「派发次数」按有调用记录的 92 次计，实际子会话 85 个，两者不能互推。
 3. **清单解析依赖文本格式**：`mroute_dispatch_plan`/`model_route_query` 的输出是给人看的中文文本，解析靠「顶格编号行」；插件改版（加段、改脚注、换符号）会静默少解析出条目（历史 bug：遇缩进续行只解析到 rank1）。脚本对解析失败只降级不报错，存在低估风险。
-4. **时间口径**：`createdAt` 决定会话归属日；跨天会话（如 802ab7be 跨 11-15 到 11-16）只计入创建日。报告正文用本地时间（UTC+8），`summary.json` 用 ISO UTC，读文件时需注意 8 小时偏移。
+4. **时间口径与窗口滑动**：`createdAt` 决定会话归属日；跨天会话（如 802ab7be 跨 11-15 到 11-16）只计入创建日。`--days N` 的 cutoff 随运行时刻滑动（同一份日志隔天复跑会得到不同的「近 N 天」数字），报告 §3.2 因此改用 `--since` 固定窗口；报告正文用本地时间（UTC+8），`summary.json` 用 ISO UTC，读文件时需注意 8 小时偏移。
 5. **`time` 字段是毫秒数字**，部分事件（`session`）没有 `seq`/`time`，只能靠 `createdAt`；「派发前」的边界在毫秒级（实测 p50 12ms），极端并发下可能把同 step 的并行调用排错顺序。
 6. **无法判断动机**：审计只用元数据（工具名/模型名/时间/错误文本），不含 prompt 正文（红线），所以「为什么没查」「为什么选了 off 路由」只能从行为模式推测，不能断言原因。
 7. **日志留存**：只看到盘上仍存在的 95 个会话；更早会话若已被清理/归档则不在统计内，历史响应率可能被高估（能留存的往往是重要会话）。
 8. **模型族归类**：按 `provider` 前缀切族（`zai-coding-cn`/`glmflash-free` → glm，`deepseek-*`/`opencode-go` 里的 deepseek 模型另计），跨渠道同名模型（`model_aliases` 里 8 条自反映射）未做规范化合并，故「按模型族」是粗粒度视图。
+9. **审计包含自身**：被审计的 95 个会话里有本次执行审计的子会话，其日志在运行期间持续增长，因此「事件总数」每次复跑都会略增（41799 → 42469 实测），但会话数、派发次数、分类结果稳定。
 
 ---
 
@@ -281,7 +284,11 @@ node plugin-mroute\devtools\audit-sessions.mjs --limit 50
 # 2) 全量（95 会话，含 JSON + Markdown）
 node plugin-mroute\devtools\audit-sessions.mjs
 
-# 3) 只算近 7 天，自定义输出路径
+# 3) 固定 7 天窗口（推荐：可复现），自定义输出路径
+node plugin-mroute\devtools\audit-sessions.mjs --since 2026-11-13T14:00:00Z `
+  --json plugin-mroute\devtools\out\last7.json --md plugin-mroute\devtools\out\last7.md
+
+# 3b) 滑动窗口（近 7 天，cutoff 随运行时刻变化）
 node plugin-mroute\devtools\audit-sessions.mjs --days 7 `
   --json plugin-mroute\devtools\out\last7.json --md plugin-mroute\devtools\out\last7.md
 
@@ -300,7 +307,7 @@ node plugin-mroute\devtools\audit-sessions.mjs --quiet
 
 产物：
 
-- `D:\Codes\DSH小插件\plugin-mroute\devtools\audit-sessions.mjs`（949 行，零依赖）
+- `D:\Codes\DSH小插件\plugin-mroute\devtools\audit-sessions.mjs`（996 行，零依赖）
 - `D:\Codes\DSH小插件\plugin-mroute\devtools\out\summary.json`（机读）
 - `D:\Codes\DSH小插件\plugin-mroute\devtools\out\audit-summary.md`（自动摘要 71 行）
 - 本报告 `D:\Codes\DSH小插件\docs\09-multi-model-session-audit.md`

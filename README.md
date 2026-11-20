@@ -133,21 +133,22 @@ skills/mroute-dispatch/
 
 | 指标 | 值 |
 |---|---|
-| 有派发的会话 | 20 |
+| 有派发的会话 | 20（92 次尝试：成功 76 / 失败 16） |
 | 派发前查过推荐（响应率） | **70.0%**（14/20） |
 | 派发前成功查到清单（查过推荐率） | **85.0%**（17/20） |
-| 近 7 天响应率 | **76.5%**（13/17，59 次派发） |
+| 近 7 天响应率 | **77.8%**（14/18，`--since` 固定窗口；查过推荐 88.9%） |
 | 按模型族 | glm 66.7%（12 有派发）/ deepseek 75.0%（8） |
 | 预检工具分布 | `mroute_dispatch_plan` 9 · `model_route_query` 8 · 未查 3 |
 | 异常 | 策略门拒绝 10 次 / 4 会话；unknown tool 16 次 / 6 会话 |
 
 ```powershell
 node plugin-mroute/devtools/audit-sessions.mjs                    # 扫当前工作区会话，出控制台统计 + out/summary.json + out/audit-summary.md
-node plugin-mroute/devtools/audit-sessions.mjs --workspace dsh_orb --days 7   # 指定工作区（slug 子串）/ 近 7 天
+node plugin-mroute/devtools/audit-sessions.mjs --since 2026-11-13T14:00:00Z   # 固定 7 天窗口（`--days` 会随运行时刻滑动，不可复现）
+node plugin-mroute/devtools/audit-sessions.mjs --workspace dsh_orb --limit 20  # 指定工作区（slug 子串）
 node plugin-mroute/devtools/audit-sessions.mjs --md docs/09.md --json out.json --top 5 --quiet
 ```
 
-可用参数：`--workspace <slug 或路径子串>`、`--limit N`、`--days N`、`--json <path>`、`--md <path>`、`--root <sessions 根>`、`--decisions <dir>`、`--patch <yml>`、`--top N`、`--quiet`、`--help`。
+可用参数：`--workspace <slug 或路径子串>`、`--limit N`、`--days N`、`--since <ISO>`、`--json <path>`、`--md <path>`、`--root <sessions 根>`、`--decisions <dir>`、`--patch <yml>`、`--top N`、`--quiet`、`--help`。
 
 > 红线：审计报告只含分类与计数，**不含 prompt 正文、密钥、token、cookie**；session id 只留前 8 位。
 

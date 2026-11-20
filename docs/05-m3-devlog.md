@@ -945,10 +945,10 @@ M4.7 的 `model_ratings` 写侧已落库（`cordis.patch.yml:476-516`，8 个规
 - 判读：**不是靠工作区 AGENTS.md 驱动**（洁净室没有），说明「skill 路由 + 插件系统提示句 + 工具」三件套在陌生工作区也能闭环。
 
 ### 21.4 多模型会话审计（`docs/09` + `plugin-mroute/devtools/audit-sessions.mjs`）
-- 脚本 949 行、零依赖、只读；**本审计最大技术坑 = `session.v4.jsonl.zstd` 是多帧拼接**，`zstdDecompressSync` 只解第一帧（某 258964B 文件只解出 276B），必须按 RFC 8878 逐帧切分（magic `0xFD2FB528`）。
+- 脚本 **997 行**（node 计数；PS 5.1 Get-Content 按 ANSI 解码会误报 949 行）、零依赖、只读；新增 --since <ISO> 固定窗口参数（--days 随运行时刻滑动、不可复现）；**本审计最大技术坑 = `session.v4.jsonl.zstd` 是多帧拼接**，`zstdDecompressSync` 只解第一帧（某 258964B 文件只解出 276B），必须按 RFC 8878 逐帧切分（magic `0xFD2FB528`）。
 - 实测：95 会话 / **41799 事件** / 0 失败文件 / 1808ms。
 - 合规分类：compliant 11、compliant_fallback 3、preflight_late 1、no_preflight 2、deviation 3、unknown 0、no_dispatch 75。
-- **响应率 70.0%（14/20）**；查过推荐率 85.0%（17/20）；近 7 天 **76.5%（13/17，59 次派发）**。
+- **响应率 70.0%（14/20）**；查过推荐率 85.0%（17/20）；近 7 天（--since 2026-11-13T14:00:00Z 固定窗口，70 会话）**77.8%（14/18）**、查过推荐率 88.9%；滑动窗口 --days 7 复跑 75.0%~77.8%，量级一致。
 - 按模型族：glm 66.7%（12 有派发）、deepseek 75.0%（8 有派发）。
 - 预检工具分布：`mroute_dispatch_plan` 9 · `model_route_query` 8 · 未查 3；同渠道异模型 4 会话。
 - 异常：宿主策略门拒绝 **10 次 / 4 会话**（被拒路由固定为 `zai-coding-cn/glm-4.6`、`deepseek-official/deepseek-chat`、`deepseek-account/deepseek-chat`，被拒后一律「省略 assignee 继承父路由」而非换下一项）；`unknown tool` 16 次 / 6 会话（含 M4.8 的 schema 注册期）；mroute 工具自身报错 3 次 / 2 会话。

@@ -10,7 +10,7 @@
  *（默认 <本脚本目录>/out/）。绝不修改 ~/.dsh 任何文件。
  *
  * 用法：
- *   node audit-sessions.mjs [--workspace <slug 或路径子串>] [--limit N] [--days N]
+ *   node audit-sessions.mjs [--workspace <slug 或路径子串>] [--limit N] [--days N | --since <ISO>]
  *                           [--json <out.json>] [--md <out.md>]
  *                           [--root <sessions 根>] [--decisions <dir>] [--patch <yml>]
  *                           [--top N] [--quiet]
@@ -80,7 +80,7 @@ function modelFamily(provider, model) {
 // ---- 参数解析 -------------------------------------------------------------
 function parseArgs(argv) {
   const out = {
-    workspace: null, limit: 0, days: 0, json: null, md: null,
+    workspace: null, limit: 0, days: 0, since: null, json: null, md: null,
     root: join(homedir(), '.dsh', 'sessions'),
     decisions: join(homedir(), '.dsh', 'mroute', 'decisions'),
     patch: join(homedir(), '.dsh', 'profiles', 'desktop', 'cordis.patch.yml'),
@@ -97,6 +97,7 @@ function parseArgs(argv) {
       case '--workspace': out.workspace = next(); break;
       case '--limit': out.limit = Number(next()) || 0; break;
       case '--days': out.days = Number(next()) || 0; break;
+      case '--since': out.since = next(); break;
       case '--json': out.json = next(); break;
       case '--md': out.md = next(); break;
       case '--root': out.root = next(); break;
@@ -114,6 +115,13 @@ function parseArgs(argv) {
   }
   if (!out.json) out.json = join(SCRIPT_DIR, 'out', 'summary.json');
   if (!out.md) out.md = join(SCRIPT_DIR, 'out', 'audit-summary.md');
+  if (out.since) {
+    const ts = Date.parse(out.since);
+    if (!Number.isFinite(ts)) throw new Error(`--since 取值无法解析为时间：${out.since}（示例 2026-11-13T00:00:00Z）`);
+    out.sinceTs = ts;
+  } else {
+    out.sinceTs = null;
+  }
   return out;
 }
 
@@ -545,9 +553,10 @@ function main() {
     }
   }
 
-  // 4) 时间过滤（--days 只保留近 N 天创建的会话）
+  // 4) 时间过滤（--since 固定起点优先；否则 --days 保留近 N 天创建的会话）
   let filtered = sessions;
-  const cutoff = args.days > 0 ? nowMs() - args.days * 86_400_000 : null;
+  const cutoff = args.sinceTs !== null ? args.sinceTs
+    : (args.days > 0 ? nowMs() - args.days * 86_400_000 : null);
   if (cutoff !== null) filtered = sessions.filter((s) => !s.createdAt || s.createdAt >= cutoff);
 
   // 5) 父子关联：child.parentRaw → 父会话；按创建时间差最近匹配父侧的派发调用
@@ -617,7 +626,7 @@ function main() {
       sessions_total_on_disk: totalFound,
       sessions_scanned: sessions.length,
       sessions_after_filter: filtered.length,
-      limit: args.limit, days: args.days, top_n: args.topN, link_window_ms: LINK_WINDOW_MS,
+      limit: args.limit, days: args.days, since: args.since, top_n: args.topN, link_window_ms: LINK_WINDOW_MS,
       failed_files: agg.meta.failed_files,
       warnings: agg.meta.warnings,
       decisions: agg.meta.decisions,
@@ -734,8 +743,8 @@ function aggregate(sessions, args, ctx) {
     planToolCounts[k] = (planToolCounts[k] || 0) + 1;
   }
   const sameChannel = withDispatch.filter((s) => /同渠道异模型/.test(s.classification.reason || '')).length;
-  // 近 7 天窗口（DoD 要求给出近 7 天真实响应率）
-  const cutoff7 = Date.now() - 7 * 86400000;
+  // 近 7 天窗口（DoD 要求给出近 7 天真实响应率）；--since 指定时用固定起点，便于复现
+  const cutoff7 = args.sinceTs !== null ? args.sinceTs : Date.now() - 7 * 86400000;
   const recent = sessions.filter((s) => s.createdAt && s.createdAt >= cutoff7);
   const recentDispatch = recent.filter((s) => s.dispatchCount > 0);
   const recentGood = recentDispatch.filter((s) => ['compliant', 'compliant_fallback'].includes(s.classification.cls)).length;
@@ -964,7 +973,7 @@ function renderMd(summary) {
   for (const [k, v] of Object.entries(bc)) rows.push(`| ${k} | ${v} |`);
   rows.push('', `响应率：**${s.response_rate_pct}**（${s.good}/${s.sessions_with_dispatch}）；查过推荐率（有派发会话中派发前成功查过清单）：**${s.preflight_rate_pct}**（${s.preflight_before_count}/${s.sessions_with_dispatch}）。`, '');
   rows.push('', `判定所用预检工具：${Object.entries(s.plan_tool_usage).map(([k, v]) => `\`${k}\` ${v}`).join(' · ')}；同渠道异模型（渠道命中但模型≠清单建议）${s.same_channel_diff_model} 会话。`, '');
-  rows.push('', `近 7 天（≥${s.last7d.cutoff}）：${s.last7d.sessions} 会话，${s.last7d.sessions_with_dispatch} 个有派发，${s.last7d.dispatches} 次派发，响应率 **${s.last7d.response_rate_pct}**（${s.last7d.good}/${s.last7d.sessions_with_dispatch}）。`, '');
+  rows.push('', `近 7 天窗口（≥${s.last7d.cutoff}；滑动窗口，可用 --since 固定）：${s.last7d.sessions} 会话，${s.last7d.sessions_with_dispatch} 个有派发，${s.last7d.dispatches} 次派发，响应率 **${s.last7d.response_rate_pct}**（${s.last7d.good}/${s.last7d.sessions_with_dispatch}），派发前查过推荐 ${s.last7d.preflight_rate_pct}（${s.last7d.preflight_before}/${s.last7d.sessions_with_dispatch}）。`, '');
   rows.push(`## 按模型族`, '', '| 模型族 | 会话 | 有派发 | compliant | fallback | 响应率 |', '|---|---|---|---|---|---|');
   for (const f of s.by_family) rows.push(`| ${f.family} | ${f.sessions} | ${f.with_dispatch} | ${f.compliant} | ${f.fallback} | ${f.response_rate === null ? '—' : (f.response_rate * 100).toFixed(1) + '%'} |`);
   rows.push('', `## 时间线`, '', '| 日期 | 会话 | 有派发 | compliant | fallback | 策略门拒绝 | 派发数 |', '|---|---|---|---|---|---|---|');
