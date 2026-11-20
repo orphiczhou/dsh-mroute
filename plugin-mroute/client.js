@@ -135,6 +135,11 @@ window.__ModuleLoader__.load({
       dynamicUnknown: '未知',
       dynamicLowBalance: '低余额',
       dynamicAsOf: '快照时间',
+      // M5：评测摘要只读一行（model_eval_run 写回的 eval_status；面板无按钮，不改数据）。
+      evalTitle: '评测：',
+      evalNever: '尚未运行（model_eval_run，默认 dry_run:true）',
+      evalRunId: 'run',
+      evalState: '状态',
       modelUnlisted: '未在模型列表中',
       dimCoding: '编码',
       dimTools: '工具调用',
@@ -248,6 +253,11 @@ window.__ModuleLoader__.load({
       dynamicUnknown: 'unknown',
       dynamicLowBalance: 'low balance',
       dynamicAsOf: 'snapshot time',
+      // M5: read-only eval summary line (eval_status written by model_eval_run; no buttons here).
+      evalTitle: 'Eval: ',
+      evalNever: 'not run yet (model_eval_run, dry_run:true by default)',
+      evalRunId: 'run',
+      evalState: 'state',
       modelUnlisted: 'not in models[]',
       dimCoding: 'coding',
       dimTools: 'tools',
@@ -607,7 +617,29 @@ window.__ModuleLoader__.load({
         model_ratings: normalizeRatings(value.model_ratings),
         // dynamic_snapshot（M4.9）：只读镜像——formFromView 读入，buildSaveOps 不含该字段。
         dynamic_snapshot: normalizeDynamicSnapshot(value.dynamic_snapshot),
+        // eval_status（M5）：只读镜像——panel 只渲染一行「评测：…」，buildSaveOps 不含该字段。
+        eval_status: normalizeEvalStatus(value.eval_status),
       }
+    }
+
+    /** eval_status 轻校验（只读镜像，M5）：坏形状回空白，不抛。 */
+    function normalizeEvalStatus(raw) {
+      const status = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+      return {
+        as_of: typeof status.as_of === 'string' ? status.as_of : '',
+        state: typeof status.state === 'string' ? status.state : '',
+        run_id: typeof status.run_id === 'string' ? status.run_id : '',
+        note: typeof status.note === 'string' ? status.note : '',
+      }
+    }
+
+    /** 「评测：…」只读文本（M5）：无 run_id 视为从未评测；有则给时间/状态/run/备注（截断防溢出）。 */
+    function evalStatusLine(status, text) {
+      const value = status && typeof status === 'object' ? status : {}
+      if (!value.run_id) return text.evalTitle + text.evalNever
+      const head = `${text.evalTitle}${value.as_of || '—'} · ${text.evalState}=${value.state || '—'} · ${text.evalRunId}=${value.run_id}`
+      const note = typeof value.note === 'string' ? value.note : ''
+      return note === '' ? head : `${head} · ${note.length > 160 ? `${note.slice(0, 160)}…` : note}`
     }
 
     /** dynamic_snapshot 轻校验（只读镜像，M4.9/M4.10）：字段缺失回缺省，坏形状回空快照不抛。 */
@@ -1160,6 +1192,7 @@ window.__ModuleLoader__.load({
         h('p', { className: 'mroute-banner', role: 'status' }, text.advisory),
         h(PreviewCard, { text, channels: form.channels }),
         h(DynamicCard, { text, snapshot: form.dynamic_snapshot }),
+        h('p', { className: 'mroute-eval-status' }, evalStatusLine(form.eval_status, text)),
         h(AliasCard, {
           text,
           channels: form.channels,
@@ -1262,6 +1295,7 @@ window.__ModuleLoader__.load({
 /* M4.10 动态层：摘要行与逐渠道行（读数用等宽数字，长原因可换行；无新主题 token） */
 .mroute-dynamic-summary { font-variant-numeric: tabular-nums; font-size: 12.5px; line-height: 1.5; color: color-mix(in srgb, currentColor 80%, transparent); overflow-wrap: anywhere; }
 .mroute-dynamic-row { font-variant-numeric: tabular-nums; font-size: 12px; line-height: 1.5; color: color-mix(in srgb, currentColor 66%, transparent); overflow-wrap: anywhere; }
+.mroute-eval-status { font-variant-numeric: tabular-nums; font-size: 12px; line-height: 1.5; margin: 2px 0 0; color: color-mix(in srgb, currentColor 72%, transparent); overflow-wrap: anywhere; }
 /* M3.1 静态层建议顺序（只读预览；不含活校验/余额/告警） */
 .mroute-preview .mroute-card-body { gap: 8px; }
 .mroute-preview-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }

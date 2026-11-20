@@ -21,6 +21,7 @@ import { createRouteQueryTool } from './lib/tool-query.js'
 import { createSyncModelsTool } from './lib/tool-sync-models.js'
 import { createAliasSuggestTool } from './lib/tool-alias-suggest.js'
 import { createDispatchPlanTool, TOOL_NAME as DISPATCH_PLAN_TOOL_NAME } from './lib/tool-dispatch-plan.js'
+import { createEvalRunTool, TOOL_NAME as EVAL_RUN_TOOL_NAME } from './lib/tool-eval-run.mjs'
 import { registerPromptSection } from './lib/prompt-section.js'
 import { createQuotaSource } from './lib/quota-source.js'
 import { createQuotaCache } from './lib/quota-cache.js'
@@ -124,6 +125,19 @@ export function apply(ctx, config) {
       ctx.effect(() => disposeDispatch, `mroute: ${DISPATCH_PLAN_TOOL_NAME} tool`)
     } catch (error) {
       logger.error?.(`[mroute] ${DISPATCH_PLAN_TOOL_NAME} 注册失败: ${errorMessage(error)}`)
+    }
+  }
+
+  // M5 自动评测：独立平级 try（理由同 M4.11——兄弟工具注册失败不应连坐，本工具失败也要独立暴露）。
+  // dry_run:true 缺省零调用零写盘；实跑只写 model_eval/eval_status 两个顶层字段（不碰 channels/ratings）。
+  if (typeof ctx.tools?.register === 'function') {
+    try {
+      const disposeEval = ctx.tools.register(
+        createEvalRunTool({ ctx, getRegistry, livecheck, logger, readConfigValue }),
+      )
+      ctx.effect(() => disposeEval, `mroute: ${EVAL_RUN_TOOL_NAME} tool`)
+    } catch (error) {
+      logger.error?.(`[mroute] ${EVAL_RUN_TOOL_NAME} 注册失败: ${errorMessage(error)}`)
     }
   }
 

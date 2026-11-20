@@ -19,6 +19,22 @@
  * （quota 快照缓存 TTL，缺省 60）。红线（任务书 §3.8）：**仅当 quota_platform 非空且
  * quota_account_verified=true 才采信 machine 数值**——映射命中 ≠ 账户体系一致（GLM Coding
  * 包月订阅 ≠ quota zhipu 卡的 API 余额），未核实一律回落 manual。
+ *
+ * ── M5 探针结论（2026-11-20，脚本 plugin-mroute/tmp/m5-probe/probe-schema.mjs 与 tool-eval-probe.mjs）──
+ * A. schemastery 形状（@deepseek-ai/schemastery@3.19.0，与宿主同版本）：
+ *    1) `z.dict(z.object(嵌套对象)).default({}).volatile()` 在**顶层**合法，空表 {} 通过，`.get()` 可读；
+ *    2) 真嵌套 z.object（scores 六维 default -1 / dimension_status z.dict(z.string()) / suggest / probe）
+ *       逐键 roundtrip 一致，缺失维解析期回填 -1，JSON 序列化后六维全部 materialize；
+ *    3) `JSON.parse(JSON.stringify(x))` 再 parse 幂等；4) 非法值解析期抛带路径错误
+ *       （`$.model_eval.m.samples expected number …`）；5) **未知键被保留**（schemastery 不 strip）；
+ *    6) 整表替换式写回（配置编辑）后两条目都在、samples 正确；7) 含 `/` `.` 的 dict 键合法。
+ *    依据 1-7：model_eval 用 z.dict(z.object(...))（按统一模型名），eval_status 用顶层 z.object。
+ * B. ctx.llm tools 注入（临时工具 mroute_eval_probe 实调，deepseek-official 与 xiaomi 两个 adapter）：
+ *    `options.tools = [{name, description, parameters}]` **被 adapter 接受**，能产出 tool-call-delta
+ *    与 finish.kind='tool-calls'（tool_calls[].id/name/argumentsDelta 可解析）⇒ tools 维可 graded，
+ *    无需按计划降到 null。另实证：usage 恒倒数第二块、finish 恒最后一块；maxTokens=64 + effort=max
+ *    会被 reasoning 吃满（finish=max-tokens、text 空）⇒ 单题 maxTokens 必须显式且留 reasoning 余量，
+ *    effort 取共同档 high（见 lib/eval/runner.mjs 的 choosePinnedEfforts）。
  */
 import z from '@deepseek-ai/schemastery'
 
@@ -282,5 +298,59 @@ export const Config = z.object({
       low_balance: z.boolean().default(false),
       display: z.string().default(''),
     })).default([]),
+  }).default({}).volatile(),
+  /**
+   * model_eval（M5-MVP / 计划 §3）：按**统一模型名（canonical）**保存最近一轮自动评测摘要。
+   * 形状 = { [canonical]: { last_run, applied_effort, instrument_healthy, scores(六维，-1=无有效样本),
+   * dimension_status({'graded'|'sentinel'|'invalid'|'null'}；sentinel = 校准哨兵，scores 留正确率但
+   * 不计入 composite/samples)、composite(-1，只对 graded 维求均值)、samples(仅 graded 样本)、
+   * wilson_lb(-1 哨兵)、provisional、suggest{tier(相对当前档的上一档，已顶格为空), priority_delta, note},
+   * evidence_refs(JSONL 路径), probe{ttft_ms,tps,samples}（MVP 不实采，恒 -1/0）} }，缺省 {}。
+   * 写入面**仅一处**：model_eval_run 实跑后经 configEditor.edit 合并写（失败静默，只报 eval_status_error）；
+   * 读侧是面板只读一行 + 未来 M5.1 的覆盖链（计划 §2：manual.status > 渠道 tier/priority >
+   * model_ratings > model_eval.suggest——suggest 只展示，**排序链不消费**）。
+   * 纪律：**永不写** channels[].tier / channels[].priority / model_ratings（advisory-only）。
+   * schemastery 依据见文件头 M5 探针结论 A（顶层 z.dict(z.object) 嵌套 roundtrip、缺省回填、未知键保留）。
+   */
+  model_eval: z.dict(z.object({
+    last_run: z.string().default(''),
+    applied_effort: z.string().default(''),
+    instrument_healthy: z.boolean().default(false),
+    scores: z.object({
+      coding: z.number().default(-1),
+      tools: z.number().default(-1),
+      long_context: z.number().default(-1),
+      vision: z.number().default(-1),
+      world_knowledge: z.number().default(-1),
+      orchestration: z.number().default(-1),
+    }).default({}),
+    dimension_status: z.dict(z.string()).default({}),
+    composite: z.number().default(-1),
+    samples: z.number().default(0),
+    wilson_lb: z.number().default(-1),
+    provisional: z.boolean().default(true),
+    suggest: z.object({
+      tier: z.string().default(''),
+      priority_delta: z.number().default(0),
+      note: z.string().default(''),
+    }).default({}),
+    evidence_refs: z.array(z.string()).default([]),
+    probe: z.object({
+      ttft_ms: z.number().default(-1),
+      tps: z.number().default(-1),
+      samples: z.number().default(0),
+    }).default({}),
+  })).default({}).volatile(),
+  /**
+   * eval_status（M5-MVP / 计划 §3）：最近一次评测的**运行态**（与 model_eval 的模型摘要分开）。
+   * 形状 = { as_of, state, run_id, note }，state ∈ 'running'（已开始、串行调用中）| 'ok'
+   * （正常完成，不论分数高低）| 'failed'（判分器哨兵未通过 → 不写分数，只记失败）；空表 = 从未评测。
+   * 写入面与 model_eval 同一处；面板只读展示「评测：…」一行。
+   */
+  eval_status: z.object({
+    as_of: z.string().default(''),
+    state: z.string().default(''),
+    run_id: z.string().default(''),
+    note: z.string().default(''),
   }).default({}).volatile(),
 })

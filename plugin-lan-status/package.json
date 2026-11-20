@@ -1,0 +1,22 @@
+{
+  "name": "@local/dsh-lan-status",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Read-only LAN status panel for DSH nodes: node properties, link state, sessions, running tasks and entry addresses",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "AGENTS.md",
+    "docs"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}

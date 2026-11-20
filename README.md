@@ -53,6 +53,7 @@ DSH 允许给子会话单独指定 `provider/model`。但一旦账号里挂了 5
 | 派发预检 | `mroute_dispatch_plan` 直接给可粘贴的 `provider/model` 清单 + 快照新鲜度 | `lib/tool-dispatch-plan.js` |
 | 设置面板 | DSH 设置里新增「模型路由」分区：渠道卡、阈值、别名、能力档位、动态层 | `plugin-mroute/client.js` |
 | 派发纪律 skill | `mroute-dispatch` skill 让任意会话按「先查 → 照抄 → 降级」三步走 | `skills/mroute-dispatch/` |
+| 自动评测（MVP） | `model_eval_run` 在对话内跑一轮最小评测（4 判分题 + 1 校准哨兵 + vision 恒 null），只写建议值不排序 | `lib/tool-eval-run.mjs`、`lib/eval/` |
 
 ## 排序与判定口径
 
@@ -76,7 +77,7 @@ DSH 允许给子会话单独指定 `provider/model`。但一旦账号里挂了 5
 
 > 红线：**映射命中 ≠ 账户体系一致**。`quota_account_verified` 为 false 的渠道即使映射到某个平台行也不采信数值（例如包月订阅渠道 ≠ 同厂商 API 余额）。
 
-## 四个工具
+## 五个工具
 
 | 工具 | 用途 | 关键入参 |
 |---|---|---|
@@ -84,6 +85,7 @@ DSH 允许给子会话单独指定 `provider/model`。但一旦账号里挂了 5
 | `model_route_query` | 完整体检表：全量 routes、余额、能力匹配、模型归并视图、告警 | `capability?` `tier_min?` `need?` |
 | `model_route_sync_models` | 把渠道 `models[]` 与宿主模型目录对齐（默认 dry-run，`apply:true` 才写） | `apply?` |
 | `model_route_alias_suggest` | 跨渠道同模型归并建议（默认 dry-run，`apply:true` 只写「同 id 跨渠道」） | `apply?` |
+| `model_eval_run` | **自动评测（MVP）**：一轮最小评测，产出 `model_eval`/`eval_status` 建议值；默认 `dry_run:true` 零调用零写盘 | `models?` `limit?` `dry_run?` `allow_monthly?` `max_calls?` |
 
 `need` 六维闭集：`coding` / `tools` / `long_context` / `vision` / `world_knowledge` / `orchestration`，取值 `fair` / `good` / `excellent`（AND 语义）。评级里另有 `none`：**明确无此能力**，与「未登记」是两件事。
 
@@ -152,6 +154,27 @@ node plugin-mroute/devtools/audit-sessions.mjs --md docs/09.md --json out.json -
 
 > 红线：审计报告只含分类与计数，**不含 prompt 正文、密钥、token、cookie**；session id 只留前 8 位。
 
+## 自动评测（M5-MVP，`model_eval_run`）
+
+在对话内跑一轮**最小**自动评测：`suite lite/1` = 4 道判分题（coding / tools / long_context / orchestration）+ 1 道校准哨兵（world_knowledge，计分但**不进 composite**）+ 1 道恒 `null` 的 vision 占位。
+
+- **默认 `dry_run:true`**：只做预算/白名单/档位预检并渲染计划，零模型调用、零写盘。
+- **成本闸**：单题 `maxTokens` 512（coding 1024）· `max_calls` 默认 18 硬顶 40 · 默认只测 **prepaid** 渠道（`allow_monthly:true` 才纳入包月；voucher 不参与）· 日预算 200 次 · 每轮串行、单题 60s 超时。
+- **调用纪律**（`lib/eval/runner.mjs`）：`ctx.llm.prepareCall(...)` 句柄一次性、`stream` 必须 spread `prepared.config`、effort 用共同档钉死（跨模型可比）、`finish.kind` 按维白名单（tools 允许 `stop|tool-calls`，其余只允许 `stop`），不在白名单一律记 `invalid` 且不写分。
+- **写回面只有两处**：`model_eval[<规范模型名>]` 与 `eval_status{state: running|ok|failed}`；**永不写** `channels[].tier` / `channels[].priority` / `model_ratings`，排序链不消费。
+- **结论强度**：Wilson 95% 下界；`samples < 12` 一律 `provisional`，此时最多给 `priority_delta`（±10，且 coding/tools 各维下界 ≥0.55），**永不给 tier**；`tier` 建议只在 `samples ≥ 12 且下界 ≥ 0.75` 时出现，且只提「相对上一档」。
+- 证据：`<DSH_HOME>/mroute/eval-history/<run_id>.jsonl`（一行 = 一次真实调用）+ 同名 `.summary.json`。
+
+```text
+评测完成 · run eval-20261120-231846-e537 · suite lite/1 · 实调 5 次
+instrument_healthy=true（判分器哨兵：5/5 通过）
+deepseek-flash（deepseek-official/deepseek-flash, prepaid）samples=4 composite=1.00 wilson_lb=0.51 provisional=true effort=high
+  维度：coding=graded(1.00) · tools=graded(1.00) · long_context=graded(1.00) · vision=null(-1) · world_knowledge=sentinel(1.00) · orchestration=graded(1.00)
+  suggest：tier='' priority_delta=0 · provisional（samples=4<12）且 coding/tools 下界 0.21/0.21 未达 0.55：不给 priority_delta
+```
+
+> 为什么 `world_knowledge` 不计分：6 道题无法公平评价世界知识，且「最高山峰」这类题污染严重（多数模型必答对）。把它算进 `composite` 会近乎免费地抬高总分并让 `priority_delta` 偏 +4，污染唯一能落地的输出。设计与裁决见 [docs/10-m5-eval-plan.md](docs/10-m5-eval-plan.md)。
+
 ## 安装
 
 ```powershell
@@ -180,6 +203,7 @@ skills/mroute-dispatch/  # 本仓库产出的全局 skill
 plugin-quota-multi/      # 多渠道额度插件（dsh-quota 的 fork，加小米 MiMo）
 plugin-orb-quota/        # 大肥鱼浮球 × 多渠道额度（dsh-orb-cordis 的 fork）
 plugin-lan-scheduler/    # LAN 多机 DSH 调度层（可靠性深化 + 审计）
+plugin-lan-status/       # 只读多节点状态面板（独立 HTTP，无 client 半）
 plugin-feishu-mirror/    # 飞书镜像插件
 _template/               # 新插件脚手架
 AGENTS.md                # 工作区协作方法与环境事实（指挥官/工人纪律）

@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-plugin-mroute",
-  "version": "0.8.2-m4.11",
+  "version": "0.9.0-m5.0",
   "private": true,
   "description": "Model route advisor for DeepSeek Harness: finance-first channel ranking (monthly > voucher > prepaid) queried via model_route_query before dispatching subagents.",
   "type": "module",
@@ -52,7 +52,7 @@
     "zh-cn"
   ],
   "scripts": {
-    "check": "node --check index.js && node --check client.js && node --check lib/config-schema.js && node --check lib/registry.js && node --check lib/volatile.js && node --check lib/livecheck.js && node --check lib/errors.js && node --check lib/ranking.js && node --check lib/dynamic-state.js && node --check lib/capability-need.js && node --check lib/tool-query.js && node --check lib/tool-sync-models.js && node --check lib/tool-alias-suggest.js && node --check lib/tool-dispatch-plan.js && node --check lib/decision-log.js && node --check lib/prompt-section.js && node --check lib/quota-source.js && node --check lib/quota-cache.js && node --check lib/quota-view.js && node --check lib/platform-map.js",
-    "selfcheck": "node --test selfcheck/source.test.mjs selfcheck/cache.test.mjs selfcheck/view.test.mjs selfcheck/degrade.test.mjs selfcheck/client.test.mjs selfcheck/sync.test.mjs selfcheck/dynamic.test.mjs selfcheck/alias.test.mjs selfcheck/need.test.mjs selfcheck/dispatch-plan.test.mjs"
+    "check": "node --check index.js && node --check client.js && node --check lib/config-schema.js && node --check lib/registry.js && node --check lib/volatile.js && node --check lib/livecheck.js && node --check lib/errors.js && node --check lib/ranking.js && node --check lib/dynamic-state.js && node --check lib/capability-need.js && node --check lib/tool-query.js && node --check lib/tool-sync-models.js && node --check lib/tool-alias-suggest.js && node --check lib/tool-dispatch-plan.js && node --check lib/tool-eval-run.mjs && node --check lib/eval/suite-lite.mjs && node --check lib/eval/runner.mjs && node --check lib/eval/score.mjs && node --check lib/eval/store.mjs && node --check lib/decision-log.js && node --check lib/prompt-section.js && node --check lib/quota-source.js && node --check lib/quota-cache.js && node --check lib/quota-view.js && node --check lib/platform-map.js",
+    "selfcheck": "node --test selfcheck/source.test.mjs selfcheck/cache.test.mjs selfcheck/view.test.mjs selfcheck/degrade.test.mjs selfcheck/client.test.mjs selfcheck/sync.test.mjs selfcheck/dynamic.test.mjs selfcheck/alias.test.mjs selfcheck/need.test.mjs selfcheck/dispatch-plan.test.mjs selfcheck/eval-run.test.mjs"
   }
 }

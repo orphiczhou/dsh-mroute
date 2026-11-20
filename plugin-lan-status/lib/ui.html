@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__PANEL_TITLE__</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #070b12;
+  --bg-soft: #0b1220;
+  --panel: rgba(15, 23, 38, .78);
+  --panel-solid: #101a2b;
+  --panel-2: rgba(22, 33, 52, .72);
+  --line: rgba(148, 163, 184, .14);
+  --line-strong: rgba(148, 163, 184, .24);
+  --ink: #e8eef8;
+  --ink-2: #c7d2e2;
+  --muted: #8b9bb4;
+  --faint: #61708a;
+  --accent: #5eead4;
+  --accent-2: #7dd3fc;
+  --accent-soft: rgba(94, 234, 212, .10);
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --err: #fb7185;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .35);
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef3fa;
+  --bg-soft: #e4ecf7;
+  --panel: rgba(255, 255, 255, .82);
+  --panel-solid: #ffffff;
+  --panel-2: rgba(247, 250, 255, .9);
+  --line: rgba(15, 23, 42, .10);
+  --line-strong: rgba(15, 23, 42, .18);
+  --ink: #102033;
+  --ink-2: #2c4058;
+  --muted: #5f728a;
+  --faint: #8394a9;
+  --accent: #0f766e;
+  --accent-2: #0369a1;
+  --accent-soft: rgba(15, 118, 110, .08);
+  --ok: #047857;
+  --warn: #b45309;
+  --err: #be123c;
+  --shadow: 0 18px 45px rgba(19, 44, 74, .12);
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 520px at 8% -8%, rgba(94, 234, 212, .09), transparent 62%),
+    radial-gradient(900px 500px at 98% 0%, rgba(125, 211, 252, .08), transparent 55%),
+    var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 ui-sans-serif, system-ui, "Segoe UI", "Noto Sans SC", "PingFang SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background-image: linear-gradient(rgba(148, 163, 184, .028) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, .028) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, #000, transparent 78%);
+}
+::selection { background: var(--accent-soft); color: var(--accent); }
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.app { width: min(1500px, calc(100% - 40px)); margin: 0 auto; padding: 18px 0 42px; }
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 18px;
+  padding: 10px 0 14px;
+  background: linear-gradient(to bottom, var(--bg) 58%, transparent);
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 250px; }
+.logo {
+  width: 38px; height: 38px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: linear-gradient(145deg, rgba(94, 234, 212, .2), rgba(125, 211, 252, .08));
+  border: 1px solid rgba(94, 234, 212, .35);
+  color: var(--accent); font-weight: 800; letter-spacing: -.04em;
+  box-shadow: 0 0 30px rgba(94, 234, 212, .12) inset;
+}
+.brand h1 { margin: 0; font-size: 17px; letter-spacing: .02em; }
+.brand p { margin: 1px 0 0; color: var(--muted); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.top-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.live { display: inline-flex; align-items: center; gap: 7px; color: var(--ok); font-size: 11px; letter-spacing: .1em; }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(52, 211, 153, .12); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
+.timestamp { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.btn {
+  border: 1px solid var(--line-strong); color: var(--ink-2); background: var(--panel);
+  border-radius: 10px; padding: 7px 11px; transition: .18s ease;
+  backdrop-filter: blur(10px);
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.btn.ghost { background: transparent; }
+.btn.primary { background: var(--accent-soft); border-color: rgba(94, 234, 212, .36); color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(420px, .9fr); gap: 28px;
+  align-items: end; padding: 24px 0 8px;
+}
+.eyebrow { color: var(--accent); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; }
+.hero h2 { margin: 8px 0 8px; font-size: clamp(28px, 4vw, 48px); line-height: 1.03; letter-spacing: -.045em; font-weight: 760; }
+.hero h2 em { font-style: normal; color: var(--accent); }
+.hero p { margin: 0; max-width: 520px; color: var(--muted); font-size: 13px; }
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.kpi {
+  border: 1px solid var(--line); border-radius: 15px; padding: 14px 15px;
+  background: linear-gradient(160deg, var(--panel), rgba(15, 23, 38, .32));
+  box-shadow: var(--shadow);
+}
+.kpi .label { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.kpi strong { display: block; margin: 6px 0 1px; font-size: 27px; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.kpi small { color: var(--faint); font-size: 11px; }
+.kpi.accent strong { color: var(--accent); }
+.alert {
+  display: none; margin: 12px 0 0; padding: 11px 13px; border-radius: 12px;
+  border: 1px solid rgba(251, 113, 133, .35); color: var(--err); background: rgba(251, 113, 133, .06);
+  font-size: 12px;
+}
+.alert.show { display: block; }
+.section { margin-top: 24px; }
+.section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 11px; }
+.section-head h2 { margin: 0; font-size: 15px; letter-spacing: .02em; }
+.section-head .hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+.node-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.probe {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 14px; background: var(--panel); color: var(--muted); font-size: 11px;
+}
+.probe .probe-label { color: var(--faint); letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+.probe-link {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px;
+  border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2);
+}
+.probe-link b { color: var(--accent); font-weight: 650; }
+.probe-link.bad { border-color: rgba(251, 113, 133, .32); color: var(--err); }
+.probe-arrow { color: var(--faint); }
+.entry-overlay {
+  position: fixed; inset: 0; z-index: 50; display: none; place-items: center;
+  padding: 18px; background: rgba(2, 6, 12, .68); backdrop-filter: blur(4px);
+}
+.entry-overlay.open { display: grid; }
+.entry-dialog {
+  width: min(520px, 100%); border: 1px solid var(--line-strong); border-radius: 18px;
+  background: var(--panel-solid); box-shadow: 0 30px 90px rgba(0, 0, 0, .5); padding: 20px;
+}
+.entry-dialog h2 { margin: 0 0 4px; font-size: 18px; letter-spacing: -.02em; }
+.entry-dialog .sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; overflow-wrap: anywhere; }
+.entry-dialog .warn {
+  margin: 0 0 14px; padding: 9px 11px; border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, .28); background: rgba(251, 191, 36, .07);
+  color: var(--warn); font-size: 11px; line-height: 1.5;
+}
+.entry-row { display: flex; gap: 8px; margin-top: 10px; }
+.entry-row .btn { flex: none; }
+.entry-row input {
+  flex: 1; min-width: 0; border: 1px solid var(--line-strong); background: var(--panel-2);
+  color: var(--ink); border-radius: 10px; padding: 8px 10px; outline: none; font-size: 13px;
+}
+.entry-row input:focus { border-color: var(--accent); }
+.entry-help { margin: 10px 0 0; color: var(--faint); font-size: 11px; line-height: 1.55; }
+.node-card {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 18px; padding: 17px 17px 14px;
+  background: linear-gradient(165deg, var(--panel), rgba(12, 20, 34, .44));
+  box-shadow: var(--shadow); transition: .2s ease; cursor: pointer;
+}
+.node-card::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(360px 120px at 0% 0%, rgba(94, 234, 212, .09), transparent 70%);
+  opacity: 0; transition: .2s ease;
+}
+.node-card:hover { border-color: rgba(94, 234, 212, .32); transform: translateY(-2px); }
+.node-card:hover::after { opacity: 1; }
+.node-card.offline { opacity: .78; }
+.node-card.offline:hover { border-color: rgba(251, 113, 133, .35); }
+.node-top { display: flex; align-items: flex-start; gap: 10px; }
+.node-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.node-id h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node-id .id { color: var(--faint); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.status-dot.ok { background: var(--ok); box-shadow: 0 0 0 4px rgba(52, 211, 153, .11); }
+.status-dot.bad { background: var(--err); box-shadow: 0 0 0 4px rgba(251, 113, 133, .11); }
+.role {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+}
+.role.coordinator { color: var(--accent); border-color: rgba(94, 234, 212, .25); background: var(--accent-soft); }
+.latency { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.node-host { margin: 8px 0 14px; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.metric .m-top { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.metric .m-top b { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.bar { height: 5px; margin-top: 6px; border-radius: 99px; background: rgba(148, 163, 184, .14); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .5s ease; }
+.bar i.warn { background: linear-gradient(90deg, var(--warn), #f97316); }
+.bar i.bad { background: linear-gradient(90deg, var(--err), #f43f5e); }
+.node-stats { display: flex; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.node-stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.node-actions { display: flex; gap: 8px; margin-left: auto; }
+.node-actions .btn { padding: 5px 9px; font-size: 11px; }
+.node-error { margin: 10px 0 0; color: var(--err); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.card {
+  border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(165deg, var(--panel), rgba(12, 20, 34, .34));
+  box-shadow: var(--shadow); padding: 15px; min-width: 0;
+}
+.card .section-head { margin-bottom: 8px; }
+.table-wrap { overflow: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 560px; }
+th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+th { color: var(--faint); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 650; }
+td { color: var(--ink-2); font-size: 12px; }
+tr:last-child td { border-bottom: 0; }
+td.wrap { white-space: normal; min-width: 180px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--muted); }
+.pill { display: inline-flex; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 10px; letter-spacing: .04em; }
+.pill.succeeded { color: var(--ok); border-color: rgba(52, 211, 153, .3); }
+.pill.failed, .pill.cancelled { color: var(--err); border-color: rgba(251, 113, 133, .3); }
+.pill.running, .pill.dispatching, .pill.queued { color: var(--warn); border-color: rgba(251, 191, 36, .3); }
+.pill.idle { color: var(--ok); }
+.empty { padding: 18px 4px; color: var(--faint); font-size: 12px; }
+.session-tools { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+.session-tools input {
+  width: 190px; border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+  border-radius: 9px; padding: 6px 9px; outline: none; font-size: 12px;
+}
+.session-tools input:focus { border-color: var(--accent); }
+.footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.drawer-overlay { position: fixed; inset: 0; background: rgba(2, 6, 12, .62); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: .2s ease; z-index: 40; }
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; z-index: 41; top: 0; right: 0; bottom: 0; width: min(620px, 100%);
+  background: var(--panel-solid); border-left: 1px solid var(--line-strong);
+  transform: translateX(102%); transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+  box-shadow: -30px 0 80px rgba(0, 0, 0, .35); display: flex; flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); }
+.drawer-head .row { display: flex; align-items: center; gap: 10px; }
+.drawer-head h2 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+.drawer-head .sub { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.drawer-close { margin-left: auto; border: 0; background: transparent; color: var(--muted); font-size: 24px; line-height: 1; padding: 4px; }
+.drawer-close:hover { color: var(--ink); }
+.tabs { display: flex; gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--line); overflow: auto; }
+.tab { border: 0; background: transparent; color: var(--muted); padding: 6px 9px; border-radius: 8px; font-size: 12px; white-space: nowrap; }
+.tab.active { color: var(--accent); background: var(--accent-soft); }
+.drawer-body { padding: 16px 20px 24px; overflow: auto; }
+.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 16px; }
+.metric-box { border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: var(--panel-2); }
+.metric-box .label { color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.metric-box b { display: block; margin-top: 5px; font-size: 20px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.metric-box small { color: var(--faint); font-size: 11px; }
+.kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 14px; font-size: 12px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.panel-title { margin: 0 0 10px; font-size: 13px; }
+pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 6, 12, .35); color: var(--ink-2); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; overflow: auto; max-height: 60vh; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; color: var(--muted); font-size: 11px; }
+.chip b { color: var(--ink); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); z-index: 60; opacity: 0; pointer-events: none; transition: .2s ease; background: var(--panel-solid); border: 1px solid var(--line-strong); color: var(--ink-2); padding: 9px 14px; border-radius: 10px; box-shadow: var(--shadow); font-size: 12px; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 1200px) { .node-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .hero { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .app { width: min(100% - 24px, 1500px); } .node-grid, .split { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .brand { min-width: 0; } .brand p { display: none; } .topbar { gap: 8px; } .timestamp { display: none; } }
+@media (max-width: 560px) { .hero h2 { font-size: 32px; } .node-actions { width: 100%; margin: 10px 0 0; } .node-stats { flex-wrap: wrap; } .node-actions .btn { flex: 1; } .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .drawer-head { padding: 15px 16px 10px; } .drawer-body { padding: 14px 16px 20px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">DS</div>
+      <div><h1>__PANEL_TITLE__</h1><p>Fleet status · read only</p></div>
+    </div>
+    <div class="top-actions">
+      <span class="live"><i></i>LIVE</span>
+      <span class="timestamp" id="timestamp">正在连接…</span>
+      <button class="btn ghost" id="theme" type="button" title="切换主题">◐</button>
+      <button class="btn primary" id="refresh" type="button">刷新</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow">DISTRIBUTED HARNESS</div>
+      <h2>四台节点，<em>一个视图</em></h2>
+      <p>节点健康、资源水位、当前会话、调度任务与入口地址。点击卡片查看详情，或直接进入对应 DSH Web 界面。</p>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <div class="alert" id="alert"></div>
+  <div class="probe" id="probe"></div>
+
+  <section class="section">
+    <div class="section-head"><h2>节点</h2><span class="hint">点击卡片查看详情 · 详情内可打开节点界面</span></div>
+    <div class="node-grid" id="nodes"></div>
+  </section>
+
+  <section class="section split">
+    <div class="card">
+      <div class="section-head"><h2>正在运行</h2><span class="hint" id="running-hint"></span></div>
+      <div id="running"></div>
+    </div>
+    <div class="card">
+      <div class="section-head"><h2>最近任务</h2><span class="hint">完成 / 失败 / 取消</span></div>
+      <div id="recent"></div>
+    </div>
+  </section>
+
+  <section class="section card">
+    <div class="section-head">
+      <h2>当前会话</h2>
+      <div class="session-tools"><input id="session-filter" type="search" placeholder="筛选标题 / 节点 / 会话…" autocomplete="off"><span class="hint" id="session-hint"></span></div>
+    </div>
+    <div id="sessions"></div>
+  </section>
+
+  <footer class="footer">
+    <span>只读快照 · 每 5 秒刷新</span>
+    <span>数据源：各节点 <span class="mono">/self</span> + 协调者调度台账</span>
+    <span id="mode-note"></span>
+  </footer>
+</div>
+
+<div class="drawer-overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="row"><span class="status-dot" id="d-dot"></span><h2 id="d-title">节点</h2><button class="drawer-close" id="d-close" type="button" aria-label="关闭">×</button></div>
+    <p class="sub" id="d-sub"></p>
+  </div>
+  <div class="tabs" id="d-tabs">
+    <button class="tab active" data-tab="overview" type="button">概览</button>
+    <button class="tab" data-tab="sessions" type="button">会话</button>
+    <button class="tab" data-tab="tasks" type="button">任务</button>
+    <button class="tab" data-tab="raw" type="button">原始数据</button>
+  </div>
+  <div class="drawer-body" id="d-body"></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<div class="entry-overlay" id="entry-overlay">
+  <div class="entry-dialog" role="dialog" aria-modal="true" aria-labelledby="entry-title">
+    <h2 id="entry-title">打开节点 DSH</h2>
+    <p class="sub" id="entry-sub"></p>
+    <p class="warn">DSH Web 需要该节点自己的 launch token。面板不保存、不转发 token；token 只提交给该节点。使用后请关闭节点标签，避免 token 留在浏览器历史。</p>
+    <div class="entry-row">
+      <button class="btn primary" id="entry-direct" type="button">直接打开（若已解锁）</button>
+      <button class="btn ghost" id="entry-cancel" type="button">取消</button>
+    </div>
+    <form id="entry-form" method="get" target="_blank" rel="noopener noreferrer" style="margin-top:12px">
+      <input type="hidden" name="interactions" value="answer">
+      <label class="sub" for="entry-token">使用 launch token 解锁</label>
+      <div class="entry-row">
+        <input id="entry-token" name="token" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off" placeholder="粘贴 launch token（不会显示）">
+        <button class="btn primary" type="submit">解锁并打开</button>
+      </div>
+    </form>
+    <p class="entry-help">token 取自节点 owner 提供的一次性 launch URL 中 <span class="mono">token=</span> 之后的部分。表单由浏览器直接提交到节点 <span class="mono">/connect</span>，不经过本面板。LAN 明文传输仅限可信网段。</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict'
+  var state = { data: null, selected: null, tab: 'overview', filter: '', loading: false, timer: null, toastTimer: null }
+  var $ = function (id) { return document.getElementById(id) }
+
+  function el(tag, attrs) {
+    var node = document.createElement(tag)
+    if (attrs) {
+      Object.keys(attrs).forEach(function (key) {
+        var value = attrs[key]
+        if (key === 'class') node.className = value
+        else if (key === 'text') node.textContent = value
+        else if (key === 'html') node.innerHTML = value
+        else if (key === 'href') node.setAttribute('href', value)
+        else if (key === 'title') node.setAttribute('title', value)
+        else if (key === 'type') node.setAttribute('type', value)
+        else if (key === 'placeholder') node.setAttribute('placeholder', value)
+        else if (key === 'value') node.value = value
+        else if (key === 'disabled') node.disabled = !!value
+        else node.setAttribute(key, value)
+      })
+    }
+    function appendChild(parent, child) {
+      if (child == null) return
+      if (Array.isArray(child)) child.forEach(function (item) { appendChild(parent, item) })
+      else parent.append(child instanceof Node ? child : document.createTextNode(String(child)))
+    }
+    for (var i = 2; i < arguments.length; i++) appendChild(node, arguments[i])
+    return node
+  }
+
+  function fmtBytes(n) {
+    if (!Number.isFinite(n) || n <= 0) return '—'
+    var units = ['B', 'KB', 'MB', 'GB', 'TB']
+    var i = 0
+    while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
+    return (n >= 10 ? n.toFixed(0) : n.toFixed(1)) + ' ' + units[i]
+  }
+
+  function fmtPct(n) { return Number.isFinite(n) ? (Math.round(n * 10) / 10) + '%' : '—' }
+  function fmtUptime(sec) {
+    if (!Number.isFinite(sec) || sec < 0) return '—'
+    var d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60)
+    if (d > 0) return d + 'd ' + h + 'h'
+    if (h > 0) return h + 'h ' + m + 'm'
+    return m + 'm'
+  }
+  function fmtTime(value) {
+    if (!value) return '—'
+    var d = new Date(value)
+    if (Number.isNaN(d.getTime())) return '—'
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+  function relTime(value) {
+    if (!value) return ''
+    var ms = Date.now() - new Date(value).getTime()
+    if (!Number.isFinite(ms) || ms < 0) return ''
+    if (ms < 60000) return '刚刚'
+    if (ms < 3600000) return Math.floor(ms / 60000) + ' 分钟前'
+    return Math.floor(ms / 3600000) + ' 小时前'
+  }
+  function pctClass(n) { return n >= 90 ? 'bad' : n >= 70 ? 'warn' : '' }
+
+  function toast(message) {
+    var node = $('toast')
+    node.textContent = message
+    node.classList.add('show')
+    clearTimeout(state.toastTimer)
+    state.toastTimer = setTimeout(function () { node.classList.remove('show') }, 2600)
+  }
+
+  function setAlert(message) {
+    var node = $('alert')
+    node.textContent = message || ''
+    node.classList.toggle('show', !!message)
+  }
+
+  function nodeById(id) {
+    return state.data && state.data.nodes ? state.data.nodes.find(function (n) { return n.instanceId === id }) : null
+  }
+
+  function summaryKpis(data) {
+    var s = data.summary || {}
+    var online = data.nodes.filter(function (n) { return n.online })
+    var avg = online.length ? Math.round(online.reduce(function (sum, n) { return sum + (n.latencyMs == null ? 0 : n.latencyMs) }, 0) / online.length) : null
+    var failed = (data.tasks && data.tasks.recent ? data.tasks.recent : []).filter(function (t) { return t.status === 'failed' }).length
+    var cards = [
+      { label: '在线节点', value: (s.online == null ? 0 : s.online) + ' / ' + (s.nodes == null ? data.nodes.length : s.nodes), sub: (s.offline || 0) + ' 个离线', accent: true },
+      { label: '当前会话', value: s.sessions == null ? 0 : s.sessions, sub: '活跃 agent' },
+      { label: '运行中任务', value: s.runningTasks == null ? 0 : s.runningTasks, sub: '共 ' + (s.totalTasks == null ? 0 : s.totalTasks) + ' 条历史' },
+      { label: '最近失败', value: failed, sub: '最近 20 条终态中' },
+      { label: '平均延迟', value: avg == null ? '—' : avg + ' ms', sub: '面板到 /self' }
+    ]
+    var root = $('kpis')
+    root.replaceChildren()
+    cards.forEach(function (card) {
+      root.append(el('div', { class: 'kpi' + (card.accent ? ' accent' : '') },
+        el('div', { class: 'label', text: card.label }),
+        el('strong', { text: String(card.value) }),
+        el('small', { text: card.sub })
+      ))
+    })
+  }
+
+  function renderProbe(data) {
+    var root = $('probe')
+    root.replaceChildren()
+    var coord = data.nodes.find(function (n) { return n.role === 'coordinator' }) || data.nodes[0]
+    if (!coord) return
+    root.append(el('span', { class: 'probe-label', text: '探针链路（非对等互通）' }))
+    root.append(el('span', { class: 'probe-link' }, el('b', { text: coord.instanceId }), 'coordinator'))
+    data.nodes.filter(function (n) { return n.instanceId !== coord.instanceId }).forEach(function (node) {
+      root.append(el('span', { class: 'probe-arrow', text: '→' }))
+      root.append(el('span', { class: 'probe-link' + (node.online ? '' : ' bad') },
+        el('b', { text: node.instanceId }),
+        node.online ? (node.latencyMs == null ? 'up' : node.latencyMs + ' ms') : (node.error || 'down')
+      ))
+    })
+  }
+
+  function renderHealth(data) {
+    var offline = data.nodes.filter(function (n) { return !n.online })
+    if (!offline.length) { setAlert(''); return }
+    setAlert('离线 ' + offline.length + ' 个节点：' + offline.map(function (n) { return n.instanceId + (n.error ? '（' + n.error + '）' : '') }).join('、') + '。其余节点数据仍在刷新。')
+  }
+
+  function metric(label, value, pct) {
+    var bar = el('div', { class: 'bar' }, el('i', { class: pctClass(pct || 0) }))
+    bar.firstChild.style.width = Math.max(0, Math.min(100, Number(pct) || 0)) + '%'
+    return el('div', { class: 'metric' },
+      el('div', { class: 'm-top' }, el('span', { text: label }), el('b', { text: value })),
+      bar
+    )
+  }
+
+  function statusText(node) {
+    if (!node.online) return node.error ? '离线 · ' + node.error : '离线'
+    return node.role === 'coordinator' ? 'coordinator' : 'online'
+  }
+
+  function shortHost(node) {
+    var sys = node.system || {}
+    var host = sys.hostname || node.hostname || node.instanceId
+    var platform = sys.platform || node.platform || ''
+    var arch = sys.arch || node.arch || ''
+    var port = ''
+    try { port = new URL(node.origin).port } catch (error) {}
+    return [host, platform ? platform + '/' + (arch || '?') : arch, port ? ':' + port : ''].filter(Boolean).join(' · ')
+  }
+
+  function renderNodes(data) {
+    var root = $('nodes')
+    root.replaceChildren()
+    data.nodes.forEach(function (node) {
+      var sys = node.system || {}
+      var disk = sys.disk || {}
+      var card = el('article', { class: 'node-card' + (node.online ? '' : ' offline'), 'data-id': node.instanceId })
+      var dotClass = node.online ? 'ok' : 'bad'
+      var title = el('div', { class: 'node-id' },
+        el('span', { class: 'status-dot ' + dotClass }),
+        el('h3', { text: node.label || node.instanceId }),
+        el('span', { class: 'id', text: node.instanceId }),
+        el('span', { class: 'role' + (node.role === 'coordinator' ? ' coordinator' : ''), text: node.role })
+      )
+      card.append(el('div', { class: 'node-top' }, title, el('span', { class: 'latency', text: node.online ? (node.latencyMs == null ? '—' : node.latencyMs + ' ms') : 'offline' })))
+      card.append(el('div', { class: 'node-host', text: node.online ? shortHost(node) : (node.error || '无响应') }))
+      card.append(el('div', { class: 'metrics' },
+        metric('CPU', fmtPct(sys.cpuPct), sys.cpuPct),
+        metric('MEM', fmtPct(sys.memUsedPct), sys.memUsedPct),
+        metric('DISK', fmtPct(disk.usedPct), disk.usedPct)
+      ))
+      var counts = node.tasks && node.tasks.counts ? node.tasks.counts : {}
+      var running = node.tasks && node.tasks.running ? node.tasks.running.length : 0
+      card.append(el('div', { class: 'node-stats' },
+        el('span', {}, el('b', { text: String((node.sessions || []).length) }), ' 会话'),
+        el('span', {}, el('b', { text: String(running) }), ' 运行'),
+        el('span', {}, el('b', { text: String(counts.failed || 0) }), ' 失败'),
+        el('span', { class: 'node-actions' },
+          el('button', { class: 'btn ghost', type: 'button', 'data-open': node.instanceId, text: '打开界面' }),
+          el('button', { class: 'btn primary', type: 'button', 'data-detail': node.instanceId, text: '详情' })
+        )
+      ))
+      if (node.online && sys.uptimeSec != null) {
+        card.append(el('div', { class: 'node-error', style: 'color:var(--faint)', text: 'uptime ' + fmtUptime(sys.uptimeSec) + ' · ' + (node.dshVersion || 'DSH ?') + ' · ' + (sys.cores || '?') + ' cores' }))
+      }
+      card.addEventListener('click', function (event) {
+        if (event.target.closest('[data-open]')) return openNode(node.instanceId)
+        openDetail(node.instanceId)
+      })
+      root.append(card)
+    })
+  }
+
+  function pill(status) {
+    return el('span', { class: 'pill ' + (status || ''), text: status || 'unknown' })
+  }
+
+  function table(headers, rows) {
+    if (!rows.length) return el('div', { class: 'empty', text: '暂无数据' })
+    var thead = el('thead', {}, el('tr', {}, headers.map(function (h) { return el('th', { class: h.wrap ? 'wrap' : '', text: h.label }) })))
+    var tbody = el('tbody', {})
+    rows.forEach(function (row) {
+      var tr = el('tr', {})
+      headers.forEach(function (h) {
+        var td = el('td', { class: h.wrap ? 'wrap' : '' })
+        var value = h.render ? h.render(row) : row[h.key]
+        if (value instanceof Node) td.append(value)
+        else td.textContent = value == null || value === '' ? '—' : String(value)
+        tr.append(td)
+      })
+      tbody.append(tr)
+    })
+    return el('div', { class: 'table-wrap' }, el('table', {}, thead, tbody))
+  }
+
+  function renderRunning(data) {
+    var rows = data.tasks && data.tasks.running ? data.tasks.running : []
+    $('running-hint').textContent = rows.length ? rows.length + ' 条' : ''
+    $('running').replaceChildren(table([
+      { label: '任务', render: function (t) { return el('span', { class: 'mono', text: t.id }) } },
+      { label: '标题', key: 'title', wrap: true },
+      { label: '节点', key: 'coordinator' },
+      { label: '状态', render: function (t) { return pill(t.status) } },
+      { label: '尝试', key: 'attempts' },
+      { label: '开始', render: function (t) { return fmtTime(t.createdAt) } }
+    ], rows))
+  }
+
+  function renderRecent(data) {
+    var rows = data.tasks && data.tasks.recent ? data.tasks.recent : []
+    $('recent').replaceChildren(table([
+      { label: '任务', render: function (t) { return el('span', { class: 'mono', text: t.id }) } },
+      { label: '标题', key: 'title', wrap: true },
+      { label: '节点', key: 'coordinator' },
+      { label: '状态', render: function (t) { return pill(t.status) } },
+      { label: '结果', render: function (t) { return t.summary || t.lastError || '—' }, wrap: true },
+      { label: '完成', render: function (t) { return fmtTime(t.finishedAt) } }
+    ], rows))
+  }
+
+  function filteredSessions(data) {
+    var query = state.filter.trim().toLowerCase()
+    var rows = data.sessions || []
+    if (query) rows = rows.filter(function (s) { return [s.instanceId, s.title, s.sessionId, s.cwd, s.status].join(' ').toLowerCase().indexOf(query) >= 0 })
+    return rows
+  }
+
+  function renderSessions(data) {
+    var rows = filteredSessions(data)
+    $('session-hint').textContent = rows.length + ' / ' + (data.sessions || []).length
+    $('sessions').replaceChildren(table([
+      { label: '节点', key: 'instanceId' },
+      { label: '会话', render: function (s) { return el('span', { class: 'mono', text: s.sessionId }) } },
+      { label: '标题', render: function (s) { return s.title || '未命名会话' }, wrap: true },
+      { label: '状态', render: function (s) { return pill(s.status) } },
+      { label: 'cwd', render: function (s) { return s.cwd || '—' }, wrap: true }
+    ], rows))
+  }
+
+  function openDetail(id) {
+    state.selected = id
+    state.tab = 'overview'
+    $('overlay').classList.add('open')
+    $('drawer').classList.add('open')
+    $('drawer').setAttribute('aria-hidden', 'false')
+    renderDrawer()
+  }
+
+  function closeDetail() {
+    state.selected = null
+    $('overlay').classList.remove('open')
+    $('drawer').classList.remove('open')
+    $('drawer').setAttribute('aria-hidden', 'true')
+  }
+
+  function renderDrawer() {
+    var node = nodeById(state.selected)
+    if (!node) return
+    var sys = node.system || {}
+    var disk = sys.disk || {}
+    $('d-title').textContent = node.label || node.instanceId
+    $('d-sub').textContent = (node.online ? statusText(node) : '离线') + ' · ' + (sys.hostname || node.hostname || node.instanceId) + ' · ' + (node.origin || '')
+    $('d-dot').className = 'status-dot ' + (node.online ? 'ok' : 'bad')
+    var tabs = $('d-tabs').querySelectorAll('.tab')
+    tabs.forEach(function (tab) { tab.classList.toggle('active', tab.getAttribute('data-tab') === state.tab) })
+    var body = $('d-body')
+    body.replaceChildren()
+    if (state.tab === 'overview') {
+      body.append(el('div', { class: 'metric-grid' },
+        box('CPU', fmtPct(sys.cpuPct), (sys.cores || '?') + ' cores · load ' + (sys.load1 == null ? '—' : sys.load1)),
+        box('MEM', fmtPct(sys.memUsedPct), fmtBytes(sys.memFree) + ' free / ' + fmtBytes(sys.memTotal)),
+        box('DISK', fmtPct(disk.usedPct), fmtBytes(disk.free) + ' free / ' + fmtBytes(disk.total))
+      ))
+      var kv = el('dl', { class: 'kv' })
+      addKv(kv, '角色', node.role)
+      addKv(kv, '在线', node.online ? 'up' : 'down' + (node.error ? ' · ' + node.error : ''))
+      addKv(kv, '入口', node.origin || '—')
+      addKv(kv, '状态端口', node.agentUrl || '—')
+      addKv(kv, 'DSH', node.dshVersion || '—')
+      addKv(kv, '主机', [sys.hostname, sys.osRelease, sys.arch].filter(Boolean).join(' · ') || '—')
+      addKv(kv, 'CPU', sys.cpuModel || '—')
+      addKv(kv, 'Node', sys.nodeVersion || node.nodeVersion || '—')
+      addKv(kv, 'Uptime', fmtUptime(sys.uptimeSec))
+      addKv(kv, '进程', 'pid ' + (sys.pid || node.pid || '—') + ' · ' + fmtUptime(sys.processUptimeSec))
+      body.append(el('h3', { class: 'panel-title', text: '系统信息' }), kv)
+      body.append(el('div', { style: 'margin-top:14px' }, el('button', { class: 'btn primary', type: 'button', 'data-open': node.instanceId, text: '打开节点 DSH 界面 ↗' })))
+    } else if (state.tab === 'sessions') {
+      body.append(table([
+        { label: '会话', render: function (s) { return el('span', { class: 'mono', text: s.sessionId }) } },
+        { label: '标题', render: function (s) { return s.title || '未命名会话' }, wrap: true },
+        { label: '状态', render: function (s) { return pill(s.status) } },
+        { label: 'cwd', render: function (s) { return s.cwd || '—' }, wrap: true }
+      ], node.sessions || []))
+    } else if (state.tab === 'tasks') {
+      var tasks = node.tasks || {}
+      var counts = tasks.counts || {}
+      var chips = el('div', { class: 'chips' }, el('span', { class: 'chip' }, '总计 ', el('b', { text: String(tasks.total || 0) })))
+      Object.keys(counts).sort().forEach(function (key) { chips.append(el('span', { class: 'chip' }, key + ' ', el('b', { text: String(counts[key]) }))) })
+      body.append(chips)
+      body.append(el('h3', { class: 'panel-title', text: '运行中' }), table([
+        { label: '任务', render: function (t) { return el('span', { class: 'mono', text: t.id }) } },
+        { label: '标题', key: 'title', wrap: true },
+        { label: '状态', render: function (t) { return pill(t.status) } },
+        { label: '尝试', key: 'attempts' }
+      ], tasks.running || []))
+      body.append(el('h3', { class: 'panel-title', style: 'margin-top:16px', text: '最近' }), table([
+        { label: '任务', render: function (t) { return el('span', { class: 'mono', text: t.id }) } },
+        { label: '标题', key: 'title', wrap: true },
+        { label: '状态', render: function (t) { return pill(t.status) } },
+        { label: '结果', render: function (t) { return t.summary || t.lastError || '—' }, wrap: true }
+      ], tasks.recent || []))
+    } else {
+      body.append(el('pre', { class: 'raw', text: JSON.stringify(node, null, 2) }))
+    }
+    body.querySelectorAll('[data-open]').forEach(function (button) { button.addEventListener('click', function () { openNode(button.getAttribute('data-open')) }) })
+  }
+
+  function box(label, value, sub) {
+    return el('div', { class: 'metric-box' }, el('div', { class: 'label', text: label }), el('b', { text: value }), el('small', { text: sub }))
+  }
+
+  function addKv(root, key, value) {
+    root.append(el('dt', { text: key }), el('dd', { text: value == null || value === '' ? '—' : String(value) }))
+  }
+
+  function closeEntry() {
+    var overlay = $('entry-overlay')
+    overlay.classList.remove('open')
+    var input = $('entry-token')
+    if (input) input.value = ''
+  }
+
+  function safeOrigin(value) {
+    try {
+      var url = new URL(value)
+      return (url.protocol === 'http:' || url.protocol === 'https:') ? url.origin : ''
+    } catch (error) {
+      return ''
+    }
+  }
+
+  function openNode(id) {
+    var node = nodeById(id)
+    if (!node) return
+    if (!node.online) { toast('节点离线，无法打开界面'); return }
+    var origin = safeOrigin(node.origin)
+    if (!origin) { toast('该节点没有配置可用的入口地址'); return }
+    $('entry-title').textContent = '打开 ' + (node.label || node.instanceId)
+    $('entry-sub').textContent = origin + '  ·  ' + (node.dshVersion || 'DSH')
+    var direct = $('entry-direct')
+    direct.disabled = false
+    direct.onclick = function () { window.open(origin, '_blank', 'noopener,noreferrer') }
+    var form = $('entry-form')
+    form.action = origin + '/connect'
+    form.reset()
+    $('entry-overlay').classList.add('open')
+    setTimeout(function () { $('entry-token').focus() }, 30)
+  }
+
+  function render(data) {
+    state.data = data
+    renderHealth(data)
+    $('timestamp').textContent = '更新于 ' + fmtTime(data.generatedAt)
+    $('mode-note').textContent = '入口：不保存 token；打开时由浏览器直接提交到节点 /connect'
+    summaryKpis(data)
+    renderProbe(data)
+    renderNodes(data)
+    renderRunning(data)
+    renderRecent(data)
+    renderSessions(data)
+    if (state.selected) renderDrawer()
+  }
+
+  async function load(force) {
+    if (state.loading) return
+    state.loading = true
+    $('refresh').disabled = true
+    try {
+      var response = await fetch('/status' + (force ? '?refresh=1' : ''), { cache: 'no-store', headers: { accept: 'application/json' } })
+      if (!response.ok) throw new Error('HTTP ' + response.status)
+      render(await response.json())
+    } catch (error) {
+      setAlert('刷新失败：' + (error && error.message ? error.message : error) + '。显示的是上一次成功数据。')
+    } finally {
+      state.loading = false
+      $('refresh').disabled = false
+    }
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme)
+    try { localStorage.setItem('lan-status-theme', theme) } catch (error) {}
+  }
+
+  $('refresh').addEventListener('click', function () { load(true) })
+  $('theme').addEventListener('click', function () {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+  })
+  $('overlay').addEventListener('click', closeDetail)
+  $('d-close').addEventListener('click', closeDetail)
+  $('entry-overlay').addEventListener('click', function (event) {
+    if (event.target === $('entry-overlay')) closeEntry()
+  })
+  $('entry-cancel').addEventListener('click', closeEntry)
+  $('entry-form').addEventListener('submit', function () {
+    setTimeout(function () { $('entry-token').value = '' }, 0)
+  })
+  $('d-tabs').addEventListener('click', function (event) {
+    var tab = event.target.closest('[data-tab]')
+    if (!tab) return
+    state.tab = tab.getAttribute('data-tab')
+    renderDrawer()
+  })
+  $('session-filter').addEventListener('input', function (event) {
+    state.filter = event.target.value || ''
+    if (state.data) renderSessions(state.data)
+  })
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { closeDetail(); closeEntry() }
+  })
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && state.data) load(false)
+  })
+  try {
+    var savedTheme = localStorage.getItem('lan-status-theme')
+    if (savedTheme === 'light' || savedTheme === 'dark') applyTheme(savedTheme)
+  } catch (error) {}
+  load(true)
+  state.timer = setInterval(function () { if (!document.hidden) load(false) }, 5000)
+})()
+</script>
+</body>
+</html>

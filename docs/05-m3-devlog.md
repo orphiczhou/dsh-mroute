@@ -963,3 +963,52 @@ M4.7 的 `model_ratings` 写侧已落库（`cordis.patch.yml:476-516`，8 个规
 ### 21.6 凭据事件（须跟进）
 - 排查 GitHub 认证时，一次性把 `~/.git-credentials` 内容打到了控制台 —— 其中含明文 github token（`orphiczhou:gho_…`）。后续所有调用均从文件读取、**不再回显**。
 - 建议用户：①轮换该 token；②`credential.helper` 从 `store` 改为 `manager`（凭据进系统凭据库而非明文文件）。
+
+## 22. M5-MVP-0：自动评测最小可运行版本（2026-11-20）
+
+### 22.1 范围与开工顺序
+- 正源 `docs/10-m5-eval-plan.md` §2/§3/§4/§5/§7/§8/§9 + 任务书 `docs/briefs/m5-mvp-dev.md`；先跑两个探针再写实现（任务书 §1）。
+- 交付 8 项全部落地：①`lib/config-schema.js` 两顶层字段 + 探针头注 ②`lib/eval/suite-lite.mjs` ③`lib/eval/runner.mjs` ④`lib/eval/score.mjs` ⑤`lib/eval/store.mjs` ⑥`lib/tool-eval-run.mjs` ⑦`index.js` 第 5 个平级 try 注册 ⑧`selfcheck/eval-run.test.mjs` + `package.json`（0.9.0-m5.0）。
+
+### 22.2 探针 A：schemastery 形状（脚本 `plugin-mroute/tmp/m5-probe/probe-schema.mjs`）
+- `z.dict(z.object(真嵌套)).default({}).volatile()` 在顶层合法：空表 {} 通过、`.get()` 可读；六维 scores/dimension_status/suggest/probe 逐键 roundtrip；缺维回填 -1；`JSON.parse(JSON.stringify())` 再 parse 幂等；非法值解析期抛带路径错误；**未知键被保留（不 strip）**；含 `/` `.` 的 dict 键合法。结论直接写进 `lib/config-schema.js` 头注（M5 段），未走降级路径。
+
+### 22.3 探针 B：`ctx.llm` 的 tools 注入（临时工具 `mroute_eval_probe`，实调后已删）
+- `options.tools=[{name,description,parameters}]` **被 deepseek-official 与 xiaomi 两个 adapter 接受**，产出 `tool-call-delta` 与 `finish.kind='tool-calls'`（id/name/argumentsDelta 可解析）⇒ **tools 维 graded，未按计划降到 null**。
+- 附带教训：maxTokens=64 + effort=max 时 reasoning 吃满（finish=max-tokens、text 空）→ 单题 maxTokens 必须显式并留 reasoning 余量；MVP 用**共同最高偏好档 high** 钉死，不用 plan 例子的 max。
+- chunk 形状再次实证：usage 恒倒数第二块、finish 恒最后一块；`listModels()` 不含 reasoning，取档位用宿主 `ctx.llm.resolveModelInfo(provider,model)`（`:2221`）。
+
+### 22.4 实现要点（相对计划的明确裁决）
+- effort：`choosePinnedEfforts` 取参与模型 efforts 交集里的最高偏好档（顺序 high→max→xhigh→medium→low→minimal）；无交集逐模型各取自身档并标注；无 reasoning 面 → 不传（runner 以 adapter materialize 值回填 applied_effort，不算 mismatch）。
+- 哨兵：`sentinelCheck(TASKS)` 用每题 fixture_pass/fixture_fail 自证（纯函数、零模型调用）；破 → 整轮不调用、不写分数，只把 `eval_status.state='failed'`。
+- 成本闸：单题 maxTokens 来自题面（coding 1024 / tools·long_context·orchestration 512 / world_knowledge 256）、`max_calls` 默认 18 硬顶 40、默认只 prepaid（`allow_monthly:true` 才纳入 monthly；voucher MVP 一律排除）、日预算 200 次（当日 eval-history 非空行数）。
+- 统计：`wilsonLowerBound`（z=1.96）；samples<12 → provisional=true 且 tier=''；`priority_delta = clamp(round(20*(composite-0.5)), ±10)`，且要求 coding/tools 下界 ≥0.55 才给；samples≥12 且总下界≥0.75 才候选 tier（MVP 不会触达）。
+- 写回：只写 `model_eval[canonical]` 与 `eval_status`（`ctx.fiber.entry` + `ctx.get('configEditor').edit`，合并写保留其他 canonical；失败静默 → 只报 `eval_status_error`）；**永不写** channels[].tier/priority/model_ratings。
+- 存储：`<DSH_HOME>/mroute/eval-history/<run_id>.jsonl` 一行=一次真实调用（skipped 不写）；`<run_id>.summary.json` 原子写（tmp+rename）。run_id=`eval-YYYYMMDD-HHmmss-<4hex>`，仅 [A-Za-z0-9._-]。
+- 面板：client.js 只加**一行只读**「评测：<as_of> · 状态=… · run=… · note」（无按钮、不进 buildSaveOps）；host 侧 `Regions.snapshot` 验证因客户端 inspect 超时未取到（见 §22.7）。
+
+### 22.5 自检与真机一轮
+- `node --check` 5 新文件 + client/index/config-schema 全 0；`npm run check` exit 0；`npm run selfcheck` **150/150**（136 + eval-run 14 组：哨兵、finish 四态、超时 aborted、vision null/-1、provisional/suggest 上限、dry_run 零调用零写盘、allow_monthly 排除、canonical 去重、max_calls 截断+JSONL 行数、配置合并写、写回失败不抛、Wilson、run_id 安全、schema 无 type 数组、effort 裁决）。
+- 热重载：`plugin_manager set_bundle @local/dsh-plugin-mroute false→true` 两轮 `application:"applied"`；`Tool.listTools` 全局可见 `model_eval_run`。
+- 真机 `model_eval_run({dry_run:false, models:['deepseek-flash'], max_calls:6})` 首轮（修正前，`eval-20261120-230846-70cb`）：实调 5 次、JSONL 5 行、哨兵 5/5、samples=5（当时把 world_knowledge 当 graded）、composite=1.00；**lead 抽读指出两处 major 后修正复跑** → `eval-20261120-231846-e537`：实调 5 次、JSONL 5 行、**samples=4**、composite=1.00、world_knowledge=sentinel(1.00)、vision=null(-1)、suggest tier=''/delta=0（下界 0.21<0.55），写回 profile patch 已核（详见 §22.8）。
+- dry_run 无参：3 个 prepaid 候选（deepseek-flash / deepseek-v4-pro / mimo-v2.6-flash）、计划 15 次、排除 2 个 monthly + 2 条跨渠道去重、今日已调用 0 次，文本含「（dry_run：未写盘、零模型调用…）」。
+
+### 22.6 零耦合（硬验收）
+- 5 个口径文件 SHA256 与改前**逐字节一致**：`lib/ranking.js` DCEF02E1…、`lib/tool-query.js` 2963CCFE…、`lib/tool-dispatch-plan.js` 7B247882…、`lib/registry.js` A755470C…、`lib/capability-need.js` 139FC0FA…（`lib/tool-eval-run.mjs` 只读引用 rankChannels/canonicalOf，不改其行为；`model_eval/eval_status` 走 readConfigValue 读，故 registry.js 无需改）。
+- 输出 diff：改前基线 `%TEMP%\m5-eval-baseline\before-*.txt` vs 改后 `after-*.txt`，归一化 ISO 时间/¥金额/百分比后 **model_route_query 与 mroute_dispatch_plan 均 NORMALIZED-IDENTICAL**（原始差异仅为 quota 实时读数与时间戳）。
+
+### 22.7 遗留风险 / 未做
+- **面板视觉未验证**：`cordis_inspect_query` client 面 `Regions.snapshot` 带 input 被拒（“input” must be an object，与 AGENTS §4 记录一致），`Regions.outline` 10s 超时（页面未打开/未响应）→ 需用户打开设置面板后目视确认「评测：…」一行；代码/词典/热重载均已就位。
+- MVP 摘要按轮覆盖（`samples` 为单轮**判分维**数 = 4，不跨 run 累积）；跨 run 累积与 12 题/维留给 M5.1。
+- `probe.ttft_ms/tps/samples` 恒 -1/0（计划明确 MVP 不实采）。
+- 真机只测 deepseek-official/deepseek-flash（策略门相关）；monthly 渠道与 xiaomi 未实跑（省钱），仅 dry_run 候选可见性验证。
+- 日预算统计按文件 mtime 当日 + 非空行数；跨进程并发跑两轮时可能短暂低估（MVP 单会话串行，风险可接受）。
+
+### 22.8 lead 抽读修正（2026-11-20，两 major + 两 minor）
+- **MAJOR-1 world_knowledge 只当校准哨兵、不进 composite**：`suite-lite.mjs` 的 world_knowledge-1 加 `sentinel:true`（skip 仍 false，真跑一次留证据）；`runner.mjs` 每条记录带 `sentinel` 字段；`score.mjs` 对 sentinel 维写 `scores=正确率`、`dimension_status='sentinel'`，**不计入** samples/successes/gradedDimensions/compositeSum/wilson_lb；`DIMENSION_STATUS_VALUES` 与输出 schema enum 增 'sentinel'，config-schema 注释同步；报告文案改「4 道判分题 + 1 道校准哨兵 + 1 道 vision 恒 null」。**为什么不能计分**：6 题里「最高山峰」这类题多数模型必答对，属于近免费的维度，计入会让 composite 系统性抬高最多 +0.2，而 `priority_delta=clamp((composite-0.5)*20)` 会因此偏 +4——唯一可产出的 actionable 输出被污染。
+- **MAJOR-2 tier 只给相对上一档**：删除 `tier='domestic_sota'` 硬编码，新增 `TIER_NEXT`/`nextTierOf()`；`aggregateModel` 收 `currentTier`（tool-eval-run 的 buildCandidates 已有 `target.tier`，经 resultRowOf 传入）：bulk→domestic_sota、domestic_sota→overseas_sota、overseas_sota/未知→不提。原实现会让 bulk 模型「跳两级」、overseas 模型反而「降级」。
+- **MINOR-3 实跑前先写 running**：runSuite 之前 `persistEval(..., {summaries:null, evalStatus:{state:'running', run_id, as_of, note:'进行中'}})`，结束照旧覆盖 ok/failed；写失败只进 notes 不阻断。否则「跑了 60 秒」与「从未跑过」在面板上同形（M4.10 教训）。
+- **MINOR-4**：本小节即记录（行为变化 + 世界知识为何不能计分）。
+- 自检：`npm run check` exit 0；`npm run selfcheck` **152/152**（150 + §15「哨兵答错不影响 composite/delta」+ §16「tier 三档相对建议 + 顶格不提」；§5/§9 断言同步改为 samples=4、world_knowledge='sentinel'、写回两次 running→ok）。
+- 真机复跑 `eval-20261120-231846-e537`（`{dry_run:false,models:['deepseek-flash'],max_calls:6}`）：实调 5 次、JSONL 5 行（world_knowledge 行 `sentinel=true`）、**samples=4**、composite=1.00、dimension_status：coding/tools/long_context/orchestration=graded、**world_knowledge=sentinel**、vision=null、suggest `tier=''`/delta=0、写回 eval_status(state=ok)。
+- 零耦合复核：5 文件 SHA256 与改前逐字节一致（清单见 §22.6）；`model_route_query`/`mroute_dispatch_plan` 归一化后仍 **NORMALIZED-IDENTICAL**。
