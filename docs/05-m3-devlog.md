@@ -1012,3 +1012,69 @@ M4.7 的 `model_ratings` 写侧已落库（`cordis.patch.yml:476-516`，8 个规
 - 自检：`npm run check` exit 0；`npm run selfcheck` **152/152**（150 + §15「哨兵答错不影响 composite/delta」+ §16「tier 三档相对建议 + 顶格不提」；§5/§9 断言同步改为 samples=4、world_knowledge='sentinel'、写回两次 running→ok）。
 - 真机复跑 `eval-20261120-231846-e537`（`{dry_run:false,models:['deepseek-flash'],max_calls:6}`）：实调 5 次、JSONL 5 行（world_knowledge 行 `sentinel=true`）、**samples=4**、composite=1.00、dimension_status：coding/tools/long_context/orchestration=graded、**world_knowledge=sentinel**、vision=null、suggest `tier=''`/delta=0、写回 eval_status(state=ok)。
 - 零耦合复核：5 文件 SHA256 与改前逐字节一致（清单见 §22.6）；`model_route_query`/`mroute_dispatch_plan` 归一化后仍 **NORMALIZED-IDENTICAL**。
+
+## 23. M5.1 正式评测（formal/1 题集 + 六维分级报告，2026-11-21）
+
+### 23.1 需求
+
+用户（m03767）：「进行模型正式评测，评测后结果按照我们的能力配置参数分级做报告给我看，需我统一才能更新。」
+→ 三条硬约束：正式题量（够算 per-dim Wilson）、按我们自己的六维量表（excellent/good/fair/none）分级、**用户确认前不得写能力配置**。
+
+### 23.2 交付
+
+| 文件 | 变化 |
+|---|---|
+| `plugin-mroute/lib/eval/suite-formal.mjs` | 新增 `SUITE_VERSION='formal/1'`，39 题：coding 10 / tools 10 / long_context 10 / orchestration 6（graded）+ world_knowledge 2（哨兵）+ vision 1（恒 null、零调用）= 38 次调用/模型 |
+| `plugin-mroute/lib/tool-eval-run.mjs` | 新增入参 `suite`（`enum:['lite','formal']`，缺省 `'lite'` 向后兼容；单一 type 字符串 + enum，遵守宿主 schema 限制） |
+| `plugin-mroute/lib/eval/score.mjs` | 新增 `suggestRating`：`excellent ⇔ lb≥0.75 且 p≥0.92`；`good ⇔ lb≥0.55`；`fair ⇔ p≥0.30`；`none ⇔ p<0.30`；`无数据 ⇔ n<6` |
+| `plugin-mroute/selfcheck/eval-formal.test.mjs` | §F1–F7：题量/维度分布、每题 fixture 双向自证、取档边界、`suite` 缺省 lite |
+| `docs/12-model-eval-report.md` | 报告（11653 bytes，141 行）：方法、逐模型逐维 p/lb 原始数字、★ 六维分级表、与 `model_ratings` 的差异表、等用户拍板 4 项 |
+| `docs/briefs/m5.1-formal-eval.md` | 任务书（本次派发正源） |
+| `package.json` | `0.9.0-m5.0` → **`0.10.0-m5.1`**（lead 补；worker 漏 bump） |
+
+### 23.3 实际执行
+
+四个 prepaid 模型 × 38 次 = **152 次调用**（日预算 200，余 48）；effort 钉死共同档 `high`；串行；单模型 `max_calls:40`。
+run_id 与落盘（`C:\Users\sir_c\.dsh\mroute\eval-history\`）：
+
+| 模型 | 渠道 | run_id | 调用 | samples | composite | wilson_lb | 总体档 |
+|---|---|---|---|---|---|---|---|
+| deepseek-flash | deepseek-official | `eval-20261121-191929-85ae` | 38 | 36 | 1.00 | 0.9036 | excellent |
+| deepseek-v4-pro | deepseek-official | `eval-20261121-192023-38d2` | 38 | 33 | 1.00 | 0.8957 | excellent（raw 口径 good） |
+| mimo-v2.6-flash | xiaomi | `eval-20261121-192341-671a` | 38 | 35 | 0.90 | 0.7762 | good |
+| mimo-v2.6-pro | xiaomi | `eval-20261121-192812-5812` | 38 | 36 | 1.00 | 0.9036 | excellent |
+
+**唯一实质弱项**：`mimo-v2.6-flash` 的 orchestration 3/5（两题只输出 1 项计划，实测判错；另 1 题答满 512 tokens 截断）。
+**截断**：`deepseek-v4-pro` 3 题（coding-2、coding-10、orchestration-2）答满 maxTokens，按现行口径记 `invalid`、不计入 samples（raw 口径下其总体档从 excellent 降 good）。
+
+### 23.4 lead 独立复核（非转述）
+
+1. `npm.cmd run check` **exit 0**（check 链已含 `suite-formal.mjs`）。
+2. `node --test selfcheck/*.test.mjs` → **tests 159 / pass 159 / fail 0**。
+3. **题集自证**：`node -e` 导入 `suite-formal.mjs`，39 题、`{coding:10,tools:10,long_context:10,orchestration:6,world_knowledge(sentinel):2,vision:1}`；逐题 `grade(fixture_pass).pass===true && grade(fixture_fail).pass===false` → **38/38 PASS**（`vision-1` 为 `skip` 计时占位，无判分器，属预期）。
+4. **从 JSONL 独立重算**（不经 worker 的 summary）：
+
+| run | coding | tools | long_context | orchestration | 哨兵 |
+|---|---|---|---|---|---|
+| flash | 10/10 graded | 10/10 | 10/10 | 6/6 | 2/2 |
+| v4-pro | 8/8 graded + **2 invalid** | 10/10 | 10/10 | 5/5 + **1 invalid** | 2/2 |
+| mimo-flash | 10/10 | 10/10 | 10/10 | **3 pass / 2 fail**（n=5）+ 1 invalid | 2/2 |
+| mimo-pro | 10/10 | 10/10 | 10/10 | 6/6 | 2/2 |
+
+与报告 §2 表逐格一致。
+5. **零耦合**：`git diff --stat` 对 `ranking.js` / `tool-query.js` / `tool-dispatch-plan.js` / `registry.js` / `capability-need.js` **为空**。
+6. **未写能力配置**：`cordis.patch.yml` 的 `model_ratings` 8 个规范名条目保持原样（deepseek-flash / deepseek-v4-pro / glm-5.3(-flash/-highspeed) / mimo-v2.6-flash / mimo-v2.6-pro / qwen3.8-flash）；本轮写入仅 `model_eval.<canonical>` 与 `eval_status`（测量记录层）。
+
+### 23.5 已知边界（写进报告 §3/§6）
+
+- **单维 excellent 在本轮样本量下不可达**：10/10 全对时 Wilson 95% 下界仅 **0.7225**（6/6 为 0.6097），而 excellent 门槛是 0.75；要单维 excellent 需 n≥13（13/13 时 lb=0.7655）。因此分级表里四个 graded 维全是 `good ★★`，**这是统计保守性，不是能力结论**；横向比较应以「总体 composite + wilson_lb」为准。
+- **截断口径**：现行 M5 设计把 `finish.kind` 不在白名单的作答记 invalid 并**剔出 samples**（截断≠答错）；raw 口径对照已在报告 §2/§3 给出，供用户裁决。
+- **vision 恒 null**（宿主把图投影成文本占位）；**world_knowledge 仅哨兵**（2/2 全对，判分器可信，不计档）。
+- 未做：`suggest` 的人工「确认采纳」入口、tier 写回、面板分级展示。
+
+### 23.6 待用户裁决（报告 §6）
+
+1. 实测档是否回写 `model_ratings`（建议：人工登记=用户判断层、实测=机器证据层，**并行展示不自动覆盖**）。
+2. 截断是否计入分母（若「预算内答不完=能力不足」，需改 score 口径）。
+3. 4 条 `suggest.tier`（deepseek ×2 → overseas_sota；mimo ×2 → domestic_sota）均 advisory、未应用。
+4. 是否扩题量到 ≥13/维，让单维能出 excellent。

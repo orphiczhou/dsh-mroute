@@ -28,6 +28,36 @@ export const PRIORITY_DELTA_CAP = 10
 /** provisional 阶段 coding/tools 下界门槛（计划 §6）。 */
 export const PROVISIONAL_DIM_LB = 0.55
 
+// ── M5.1 分级量表（任务书 m5.1-formal-eval.md §4，报告 §3 取档公式）──────────
+/** excellent：Wilson 95% 下界与正确率双门槛。 */
+export const RATING_EXCELLENT_LB = 0.75
+export const RATING_EXCELLENT_P = 0.92
+/** good：仅看下界。 */
+export const RATING_GOOD_LB = 0.55
+/** fair：仅看正确率（不满足 good 时）。 */
+export const RATING_FAIR_P = 0.30
+/** 单维最小有效样本：不足 → 无数据（不做档位判断）。 */
+export const RATING_MIN_SAMPLES = 6
+
+/**
+ * M5.1 取档公式（原样实现，报告 §3 注明）：
+ *   excellent ⇔ lb ≥ 0.75 且 p ≥ 0.92；good ⇔ lb ≥ 0.55；fair ⇔ p ≥ 0.30（且不满足 good）；
+ *   none ⇔ p < 0.30；无数据 ⇔ n < 6 或 n ≤ 0（该维 null/skipped/样本不足）。
+ * @param {number} passed 通过数
+ * @param {number} n 样本数
+ * @returns {'excellent'|'good'|'fair'|'none'|'no_data'}
+ */
+export function suggestRating(passed, n) {
+  const total = Number(n)
+  if (!Number.isFinite(total) || total < RATING_MIN_SAMPLES) return 'no_data'
+  const p = Math.min(1, Math.max(0, Number(passed) / total))
+  const lb = wilsonLowerBound(passed, total)
+  if (lb >= RATING_EXCELLENT_LB && p >= RATING_EXCELLENT_P) return 'excellent'
+  if (lb >= RATING_GOOD_LB) return 'good'
+  if (p >= RATING_FAIR_P) return 'fair'
+  return 'none'
+}
+
 /**
  * Wilson score interval 下界（95%，z=1.96）。
  * @param {number} successes 成功数（整数）

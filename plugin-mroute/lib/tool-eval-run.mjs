@@ -19,7 +19,8 @@
  *    取共同最高偏好档（优先 high）；取不到时不钉死，报告中显式标注（跨模型比较需谨慎）。
  * 6. 宿主工具 JSON schema 只用单一 type 字符串（禁 type 数组）；可空字段发单一 type、无值不发键。
  */
-import { SUITE_VERSION, DIMENSIONS, TASKS, EXECUTABLE_TASKS, sentinelCheck } from './eval/suite-lite.mjs'
+import * as SUITE_LITE from './eval/suite-lite.mjs'
+import * as SUITE_FORMAL from './eval/suite-formal.mjs'
 import { aggregateModel, finishCounts } from './eval/score.mjs'
 import {
   choosePinnedEfforts,
@@ -45,11 +46,23 @@ export const DAILY_CALL_BUDGET = 200
 const MAX_MODELS_ARG = 10
 const CHANNEL_TYPE_VALUES = ['monthly', 'voucher', 'prepaid']
 const DIMENSION_STATUS_VALUES = ['graded', 'sentinel', 'invalid', 'null']
-/** 题集分层（报告与 composite 口径一致：哨兵不计分）。 */
-const GRADED_TASKS = EXECUTABLE_TASKS.filter((task) => task.sentinel !== true)
-const SENTINEL_TASKS = EXECUTABLE_TASKS.filter((task) => task.sentinel === true)
-const NULL_TASKS = TASKS.filter((task) => task.skip === true)
-const SENTINEL_DIMENSIONS = [...new Set(SENTINEL_TASKS.map((task) => task.dimension))]
+const SUITE_KEYS = ['lite', 'formal']
+const DIMENSIONS = SUITE_LITE.DIMENSIONS
+
+/**
+ * 题集注册表（M5.1：suite 入参缺省 'lite' 向后兼容）。
+ * 每项预计算：graded / sentinels / nulls / sentinelDimensions（报告与 composite 口径一致：哨兵不计分）。
+ */
+const SUITES = {
+  lite: { key: 'lite', version: SUITE_LITE.SUITE_VERSION, tasks: SUITE_LITE.TASKS, executable: SUITE_LITE.EXECUTABLE_TASKS, sentinelCheck: SUITE_LITE.sentinelCheck },
+  formal: { key: 'formal', version: SUITE_FORMAL.SUITE_VERSION, tasks: SUITE_FORMAL.TASKS, executable: SUITE_FORMAL.EXECUTABLE_TASKS, sentinelCheck: SUITE_FORMAL.sentinelCheck },
+}
+for (const suite of Object.values(SUITES)) {
+  suite.graded = suite.executable.filter((task) => task.sentinel !== true)
+  suite.sentinels = suite.executable.filter((task) => task.sentinel === true)
+  suite.nulls = suite.tasks.filter((task) => task.skip === true)
+  suite.sentinelDimensions = [...new Set(suite.sentinels.map((task) => task.dimension))]
+}
 
 /** 轻量类型断言：所有入参校验必须先于任何 IO（任务书 §3）。 */
 function validateArgs(args) {
@@ -80,6 +93,14 @@ function validateArgs(args) {
     if (limit !== input.limit) notes.push(`limit 已收敛为 ${limit}（允许 1..10）`)
   }
 
+  let suite = 'lite'
+  if (input.suite !== undefined && input.suite !== null) {
+    if (typeof input.suite !== 'string' || !SUITE_KEYS.includes(input.suite)) {
+      throw new Error(`${TOOL_NAME}: suite 参数非法：必须是 "lite" 或 "formal"（收到 ${JSON.stringify(input.suite)}）`)
+    }
+    suite = input.suite
+  }
+
   let dryRun = true
   if (input.dry_run !== undefined && input.dry_run !== null) {
     if (typeof input.dry_run !== 'boolean') throw new Error(`${TOOL_NAME}: dry_run 参数非法：必须是布尔值（缺省 true）`)
@@ -100,7 +121,7 @@ function validateArgs(args) {
     maxCalls = Math.min(HARD_MAX_CALLS, input.max_calls)
     if (maxCalls !== input.max_calls) notes.push(`max_calls 已收敛为硬顶 ${HARD_MAX_CALLS}`)
   }
-  return { models, limit, dryRun, allowMonthly, maxCalls, notes }
+  return { models, limit, suite, dryRun, allowMonthly, maxCalls, notes }
 }
 
 /** 当前动态层（只读配置快照，供排序复现 M4.5 的 tight 沉底；不触发任何 quota 请求）。 */
@@ -246,14 +267,14 @@ function describeTarget(target) {
 }
 
 /** dry_run 文本：预算 + 白名单 + 将评测清单（可直接读，不写盘）。 */
-function renderPlan({ runId, targets, excluded, effortNote, effortProblems, maxCalls, allowMonthly, daily, plannedCalls, notes }) {
+function renderPlan({ suite, runId, targets, excluded, effortNote, effortProblems, maxCalls, allowMonthly, daily, plannedCalls, notes }) {
   const lines = []
-  lines.push(`评测预检 · model eval / suite ${SUITE_VERSION} · ${GRADED_TASKS.length} 道判分题 + ${SENTINEL_TASKS.length} 道校准哨兵（不计入 composite） + ${NULL_TASKS.length} 道恒 null · effort=${effortNote}`)
+  lines.push(`评测预检 · model eval / suite ${suite.version} · ${suite.graded.length} 道判分题 + ${suite.sentinels.length} 道校准哨兵（不计入 composite） + ${suite.nulls.length} 道恒 null · effort=${effortNote}`)
   lines.push(`渠道白名单：${allowMonthly ? 'prepaid + monthly(allow_monthly=true)' : 'prepaid（allow_monthly=false）'}；voucher 在 MVP 不参与`)
   lines.push(`将评测（${targets.length} 个统一模型名，跨渠道已去重）：`)
   for (const [index, target] of targets.entries()) lines.push(`  ${index + 1}. ${describeTarget(target)}`)
-  const perTaskTokens = EXECUTABLE_TASKS.map((task) => `${task.id}=${task.maxTokens}`).join(' · ')
-  lines.push(`预算：计划 ${plannedCalls} 次调用（上限 max_calls=${maxCalls}）· 单题 maxTokens ${perTaskTokens} · 单题超时 ${Math.round(DEFAULT_TIMEOUT_MS / 1000)}s · 串行`)
+  const perTaskTokens = suite.executable.map((task) => `${task.id}=${task.maxTokens}`).join(' · ')
+  lines.push(`预算：计划 ${plannedCalls} 次调用（上限 max_calls=${maxCalls}）· 单题 maxTokens（${suite.executable.length} 题）${perTaskTokens} · 单题超时 ${Math.round(DEFAULT_TIMEOUT_MS / 1000)}s · 串行`)
   lines.push(`今日已调用 ${daily.count} 次（日预算 ${DAILY_CALL_BUDGET}${daily.count + plannedCalls > DAILY_CALL_BUDGET ? '，本轮预计超出 → 实跑会被拒绝' : ''}）`)
   if (excluded.length > 0) {
     lines.push(`排除：`)
@@ -267,11 +288,11 @@ function renderPlan({ runId, targets, excluded, effortNote, effortProblems, maxC
 }
 
 /** 实跑文本：每模型分数/维度状态/finish 计数/suggest + 写回结论。 */
-function renderRun({ runId, jsonlPath, summaryPath, instrumentHealthy, sentinel, callsExecuted, skipped, maxCalls, results, configWrite }) {
+function renderRun({ suite, runId, jsonlPath, summaryPath, instrumentHealthy, sentinel, callsExecuted, skipped, maxCalls, results, configWrite }) {
   const lines = []
-  lines.push(`评测完成 · run ${runId} · suite ${SUITE_VERSION} · 实调 ${callsExecuted} 次${skipped.length > 0 ? `（达到 max_calls=${maxCalls}，跳过 ${skipped.length} 题）` : ''}`)
-  lines.push(`instrument_healthy=${instrumentHealthy}（判分器哨兵：${sentinel.ok ? `${EXECUTABLE_TASKS.length}/${EXECUTABLE_TASKS.length} 通过` : `破 → ${sentinel.issues.join('；')}`}）`)
-  lines.push(`题集：${GRADED_TASKS.length} 道判分（计入 composite）+ ${SENTINEL_TASKS.length} 道校准哨兵（scores 留证据，不计入 composite/samples）+ ${NULL_TASKS.length} 道 vision 恒 null`)
+  lines.push(`评测完成 · run ${runId} · suite ${suite.version} · 实调 ${callsExecuted} 次${skipped.length > 0 ? `（达到 max_calls=${maxCalls}，跳过 ${skipped.length} 题）` : ''}`)
+  lines.push(`instrument_healthy=${instrumentHealthy}（判分器哨兵：${sentinel.ok ? `${suite.executable.length}/${suite.executable.length} 通过` : `破 → ${sentinel.issues.join('；')}`}）`)
+  lines.push(`题集：${suite.graded.length} 道判分（计入 composite）+ ${suite.sentinels.length} 道校准哨兵（scores 留证据，不计入 composite/samples）+ ${suite.nulls.length} 道 vision 恒 null`)
   for (const result of results) {
     lines.push('')
     lines.push(`${result.canonical}（${result.provider}/${result.model}, ${result.channel_type}）samples=${result.samples} composite=${formatPct(result.composite)} wilson_lb=${formatPct(result.wilson_lb)} provisional=${result.provisional}${result.effort ? ` effort=${result.effort}` : ''}`)
@@ -291,7 +312,7 @@ function renderRun({ runId, jsonlPath, summaryPath, instrumentHealthy, sentinel,
 }
 
 /** 单个模型的结果行（结构化输出用；scores/dimension_status 固定六键）。 */
-function resultRowOf(target, calls, { instrumentHealthy, runId, refs }) {
+function resultRowOf(target, calls, { instrumentHealthy, runId, refs, suite }) {
   const summary = aggregateModel({
     calls,
     applied_effort: target.effort,
@@ -299,7 +320,7 @@ function resultRowOf(target, calls, { instrumentHealthy, runId, refs }) {
     run_id: runId,
     evidence_refs: refs,
     currentTier: target.tier,
-    sentinel_dimensions: SENTINEL_DIMENSIONS,
+    sentinel_dimensions: suite.sentinelDimensions,
   })
   return {
     canonical: target.canonical,
@@ -398,7 +419,8 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
   return {
     name: TOOL_NAME,
     description:
-      '跑一轮最小模型自动评测（suite lite/1：4 道判分题 coding/tools/long_context/orchestration + 1 道校准哨兵 world_knowledge（不计入 composite）+ 1 道 vision 恒 null）。'
+      '跑一轮最小模型自动评测（suite 缺省 lite/1：4 道判分题 + 1 道校准哨兵 + 1 道 vision 恒 null；'
+      + 'suite:"formal" 为 M5.1 正式卷 formal/1：coding 10 / tools 10 / long_context 10 / orchestration 6 判分题 + 2 道校准哨兵 + 1 道 vision 恒 null，共 38 次/模型）。'
       + '默认 dry_run:true 只预检不调用不写盘；dry_run:false 才真正串行调用宿主 llm 并写 '
       + '<DSH_HOME>/mroute/eval-history/<run_id>.jsonl 与配置 model_eval/eval_status。'
       + '成本闸：单题 maxTokens 512（coding 1024）、max_calls 默认 18 硬顶 40、默认只测 prepaid 渠道、日预算 200 次。'
@@ -407,6 +429,11 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       type: 'object',
       additionalProperties: false,
       properties: {
+        suite: {
+          type: 'string',
+          enum: ['lite', 'formal'],
+          description: '题集版本：缺省 "lite"（M5-MVP 6 题）；"formal"（M5.1 正式卷，38 次/模型，需 max_calls≥38 才能单轮跑完单模型）。',
+        },
         models: {
           type: 'array',
           items: { type: 'string' },
@@ -485,6 +512,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
     async execute(args, _exec) {
       // ── 1) 入参校验（先于任何 IO）───────────────────────────────────
       const parsed = validateArgs(args)
+      const suite = SUITES[parsed.suite]
       const notes = [...parsed.notes]
 
       // ── 2) 注册表 + 活校验 + 动态层（本地配置/目录读取，零出站 HTTP）──────
@@ -509,13 +537,13 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       const effortResult = await resolveEfforts(ctx?.llm, targets)
       for (const problem of effortResult.problems) notes.push(problem)
 
-      const plannedCalls = targets.length * EXECUTABLE_TASKS.length
-      const sentinel = sentinelCheck(TASKS)
+      const plannedCalls = targets.length * suite.executable.length
+      const sentinel = suite.sentinelCheck(suite.tasks)
       const daily = await countCallsToday({ dir: evalDir, logger })
       const runId = makeRunId()
       const common = {
         run_id: runId,
-        suite_version: SUITE_VERSION,
+        suite_version: suite.version,
         allow_monthly: parsed.allowMonthly,
         instrument_healthy: sentinel.ok,
         max_calls: parsed.maxCalls,
@@ -530,6 +558,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       // ── 4) dry_run：零调用、零写盘 ─────────────────────────────────────
       if (parsed.dryRun) {
         const text = renderPlan({
+          suite,
           runId,
           targets,
           excluded: built.excluded,
@@ -586,7 +615,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
         as_of: new Date().toISOString(),
         state: 'running',
         run_id: runId,
-        note: `suite ${SUITE_VERSION} · ${targets.length} 模型 × ${EXECUTABLE_TASKS.length} 题 · 串行进行中（预计 ≤${plannedCalls} 次调用）`,
+        note: `suite ${suite.version} · ${targets.length} 模型 × ${suite.executable.length} 题 · 串行进行中（预计 ≤${plannedCalls} 次调用）`,
       }
       const runningWrite = await persistEval(ctx, { summaries: null, evalStatus: runningStatus, logger })
       if (runningWrite.ok !== true) notes.push(`eval_status(running) 写回失败（不影响本轮）：${runningWrite.error ?? '未知错误'}`)
@@ -596,18 +625,18 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       const run = await runSuite({
         llm: ctx.llm,
         targets,
-        tasks: EXECUTABLE_TASKS,
+        tasks: suite.executable,
         maxCalls: parsed.maxCalls,
         timeoutMs: DEFAULT_TIMEOUT_MS,
         runId,
-        suiteVersion: SUITE_VERSION,
+        suiteVersion: suite.version,
         logger,
         onCall: (record) => recorder.append(record),
       })
       const refs = [recorder.file]
       const rows = targets.map((target) => {
         const calls = run.calls.filter((call) => call.canonical === target.canonical)
-        return resultRowOf(target, calls, { instrumentHealthy: sentinel.ok, runId, refs })
+        return resultRowOf(target, calls, { instrumentHealthy: sentinel.ok, runId, refs, suite })
       })
       const summaries = {}
       for (const row of rows) summaries[row.canonical] = row.summary
@@ -615,7 +644,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
         as_of: new Date().toISOString(),
         state: 'ok',
         run_id: runId,
-        note: `suite ${SUITE_VERSION} · ${rows.map((row) => `${row.canonical}:samples=${row.samples}`).join(', ')}${run.stoppedReason ? ` · ${run.stoppedReason}` : ''}`,
+        note: `suite ${suite.version} · ${rows.map((row) => `${row.canonical}:samples=${row.samples}`).join(', ')}${run.stoppedReason ? ` · ${run.stoppedReason}` : ''}`,
       }
       const configWrite = await persistEval(ctx, { summaries, evalStatus, logger })
       const summaryPath = await writeRunSummary({
@@ -623,7 +652,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
         runId,
         summary: {
           run_id: runId,
-          suite_version: SUITE_VERSION,
+          suite_version: suite.version,
           as_of: evalStatus.as_of,
           instrument_healthy: sentinel.ok,
           allow_monthly: parsed.allowMonthly,
@@ -638,6 +667,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       })
       if (summaryPath === '') notes.push('摘要 JSON 写盘失败（JSONL 证据仍在）')
       const text = renderRun({
+        suite,
         runId,
         jsonlPath: recorder.file,
         summaryPath,
