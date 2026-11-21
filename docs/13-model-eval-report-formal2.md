@@ -183,3 +183,97 @@ p = passed/n；lb = Wilson 95% 下界（z=1.96，`lib/eval/score.mjs wilsonLower
 - [x] 零耦合：`ranking.js` / `tool-query.js` / `tool-dispatch-plan.js` / `registry.js` / `capability-need.js` 的 `git diff --stat` 为空
 - [x] 未写 `model_ratings` / `channels[].tier` / `channels[].priority`；仅写 `model_eval` + `eval_status`
 - [x] 版本 `0.11.0-m5.2`；任务书 §2.3 六段结构落盘（本文件）
+
+## 8. 补测：包月渠道 GLM（2026-11-21 晚）
+
+> 用户要求（2026-11-21 晚）：在 §0–§7 的 4 个 prepaid 模型之外**补测包月渠道 GLM**，只跑 `glm-5.3` 与 `glm-5.3-flash`；`glm-5.3-highspeed` 明确不跑（用户判断「只是速度差异」）。本节只追加，**不改 §0–§7 与上文验收自检的任何章节与数字**。
+
+### 8.1 为什么默认没有测到 GLM
+
+`model_eval_run` 的渠道白名单默认 **prepaid-only**：候选装配对 `channel_type==='voucher'` 一律排除（`plugin-mroute/lib/tool-eval-run.mjs:183-184`），对 `monthly` **仅当 `allow_monthly:true` 时**才纳入（`plugin-mroute/lib/tool-eval-run.mjs:187-188`；入参缺省 `false`，`:123`）。GLM 两个模型所在的渠道都是包月：zai-coding-cn（`glm-5.3` / `glm-5.3-flash` / `glm-5.3-highspeed`，tier `domestic_sota`、priority 90）与 opencode-go（只有 `glm-5.3-flash`）。因此 §1 的 `allow_monthly=false` 轮次里整条渠道被排除、GLM 根本没进候选；本轮两次 dry_run 显式带 `allow_monthly:true` 后才出现在「将评测」清单。
+
+### 8.2 执行与 run 表
+
+- **一次 invocation 只跑一个模型**（`max_calls` 是单次调用全局上限）：`{suite:'formal', models:['<单模型>'], allow_monthly:true, max_calls:60}` 串行两次；每次先 `dry_run:true` 核对「计划 54 次 + 当日累计 ≤ 500」再 `dry_run:false`。
+- effort 钉死共同档 `high`、单题超时 60s、54 次/模型；两次 run 均 `instrument_healthy=true`（哨兵 54/54）、`provisional=false`、**0 max-tokens 截断 / 0 invalid**；maxTokens 实分布 8192×26 · 2048×26 · 1024×2（与 §1 分档一致，`max_tokens` 覆盖参未启用）。
+- `glm-5.3-flash` 的跨渠道去重：dry_run 原文排除 `opencode-go/glm-5.3-flash: 统一模型名 "glm-5.3-flash" 已在更高序渠道入选（跨渠道去重）` ⇒ **只测了 zai-coding-cn 那一份**。
+
+| 模型 | 渠道 | run_id | 执行时刻（本地） | 调用 | graded samples | tokens | 墙钟 |
+|---|---|---|---|---|---|---|---|
+| glm-5.3 | zai-coding-cn（monthly） | `eval-20261121-213304-6132` | 21:33:04–21:36:41 | 54 | 52 | 30,075 | 217s |
+| glm-5.3-flash | zai-coding-cn（monthly） | `eval-20261121-213654-90c8` | 21:36:55–21:41:30 | 54 | 52 | 30,693 | 275s |
+
+### 8.3 逐维原始数字
+
+#### glm-5.3（zai-coding-cn/glm-5.3，run `eval-20261121-213304-6132`）
+
+| 维度 | passed/n | p | lb | 档 | finish 备注 |
+|---|---|---|---|---|---|
+| coding | 13/13 | 1.0000 | 0.7719 | excellent | stop×13 |
+| tools | 13/13 | 1.0000 | 0.7719 | excellent | tool-calls×13，参数全中 |
+| long_context | 13/13 | 1.0000 | 0.7719 | excellent | 跨节校验码全中 |
+| orchestration | 13/13 | 1.0000 | 0.7719 | excellent | 数组长度 + id/name/deps 全过 |
+| world_knowledge（哨兵） | 2/2 | 1.0000 | — | 不计档 | 只作判分器校准 |
+| vision | — | — | — | 无数据 | 恒 null |
+
+总体：samples=52 composite=**1.0000** wilson_lb=**0.9312** → **excellent**。finish：stop=41 tool-calls=13 max-tokens=0 error=0 aborted=0；平均 TTFT 1753ms。suggest：`domestic_sota → overseas_sota`，+10（advisory 未应用）。
+
+#### glm-5.3-flash（zai-coding-cn/glm-5.3-flash，run `eval-20261121-213654-90c8`）
+
+| 维度 | passed/n | p | lb | 档 | finish 备注 |
+|---|---|---|---|---|---|
+| coding | 13/13 | 1.0000 | 0.7719 | excellent | stop×13 |
+| tools | 13/13 | 1.0000 | 0.7719 | excellent | tool-calls×13，参数全中 |
+| long_context | 13/13 | 1.0000 | 0.7719 | excellent | 跨节校验码全中 |
+| orchestration | 13/13 | 1.0000 | 0.7719 | excellent | 数组长度 + id/name/deps 全过 |
+| world_knowledge（哨兵） | 2/2 | 1.0000 | — | 不计档 | 只作判分器校准 |
+| vision | — | — | — | 无数据 | 恒 null |
+
+总体：samples=52 composite=**1.0000** wilson_lb=**0.9312** → **excellent**。finish：stop=41 tool-calls=13 max-tokens=0 error=0 aborted=0；平均 TTFT 2360ms。suggest：`domestic_sota → overseas_sota`，+10（advisory 未应用）。
+
+### 8.4 六维分级表（★）
+
+取档口径同 §3（`suggestRating`：excellent ⇔ lb≥0.75 且 p≥0.92；good ⇔ lb≥0.55；fair ⇔ p≥0.30；none ⇔ p<0.30；无数据 ⇔ n<6）。13/13 → lb **0.7719** 刚好越线，与 §3 的 n=13 边界一致。
+
+| 模型 | coding | tools | long_context | vision | world_knowledge（哨兵） | orchestration | 总体（composite / lb / 档） |
+|---|---|---|---|---|---|---|---|
+| glm-5.3 | excellent ★★★（13/13, lb .7719） | excellent ★★★（13/13, lb .7719） | excellent ★★★（13/13, lb .7719） | 无数据 | 2/2 对（不计档） | excellent ★★★（13/13, lb .7719） | 1.0000 / **.9312** / **excellent** ★★★ |
+| glm-5.3-flash | excellent ★★★（13/13, lb .7719） | excellent ★★★（13/13, lb .7719） | excellent ★★★（13/13, lb .7719） | 无数据 | 2/2 对（不计档） | excellent ★★★（13/13, lb .7719） | 1.0000 / **.9312** / **excellent** ★★★ |
+
+> **跨模型位置**：两模型与 deepseek-flash / deepseek-v4-pro 并列 formal/2 最好成绩（composite 1.0000、lb .9312），高于 mimo-v2.6-pro（.9615/.8702）与 mimo-v2.6-flash（.9231/.8183）。**GLM 的加入没有增加区分度**——6 个受测模型里已有 4 个 lb .9312，若目标是分辨模型，应看失分题型或继续加题（同 §6.5）。
+
+### 8.5 与当前 `model_ratings` 手工登记的差异（只陈述，未写入）
+
+当前登记见 `cordis.patch.yml` 的顶层 `model_ratings` 块（`glm-5.3-flash` / `glm-5.3` 两行；该文件同时被宿主配置写入器改写，行号不稳定，按 key 定位）。**本轮未写任何 `model_ratings` 条目**。
+
+| 模型 | 维度 | 当前登记 | 实测档 | 差异说明 |
+|---|---|---|---|---|
+| glm-5.3 | coding / tools / long_context / orchestration | excellent ×4 | excellent ×4（13/13） | **一致** |
+| glm-5.3 | vision / world_knowledge | none / excellent | 无数据 / 哨兵 2/2 | vision 本轮无证据；world_knowledge 只作哨兵 |
+| glm-5.3-flash | coding | good | **excellent**（13/13, lb .7719） | **登记偏保守** |
+| glm-5.3-flash | tools | excellent | excellent（13/13） | 一致 |
+| glm-5.3-flash | long_context | good | **excellent**（13/13） | **登记偏保守** |
+| glm-5.3-flash | orchestration | good | **excellent**（13/13） | **登记偏保守**（与 M5.1 的 fair 判断同向偏保守） |
+| glm-5.3-flash | vision / world_knowledge | good / good | 无数据 / 哨兵 2/2 | vision 无证据；哨兵不构成档位 |
+| glm-5.3-highspeed | 全部 | 与 glm-5.3 相同（excellent×4 / none / excellent） | **未测** | 用户裁决不跑（仅速度差异），无新证据 |
+
+渠道档位建议（advisory，均未应用）：zai-coding-cn 两条都出 `domestic_sota → overseas_sota`（+10）。`channels[]` 的 tier/priority 未被改写（zai 行仍是 `tier: domestic_sota`、`priority: 90`，与 suggest 相反即为证据）。
+
+### 8.6 当日预算披露
+
+- 当日实际调用：M5.1 **152** + M5.2 四模型 **216** + 本轮 GLM **108** = **476 次**（`eval-history` 中 2026-11-21 的 JSONL 行合计 476，独立核过）。
+- 两次 dry_run 的累计行照实打印：`今日已调用 368 次（日预算 500）· 本轮预计再调 54 次 → 当日累计 422 次` → `今日已调用 422 次（日预算 500）· 本轮预计再调 54 次 → 当日累计 476 次`。
+- **500 是用户 2026-11-21 晚再次一次性放宽**（`plugin-mroute/lib/tool-eval-run.mjs:55` `DAILY_CALL_BUDGET=500`，常量上方注释写明「常规仍按 300 执行，M5.3 起回落」）。证据未归档、计数未绕过，预检与实跑都走同一计数器。
+
+### 8.7 局限
+
+1. **包月渠道运行时扰动 5h 窗口**：zai-coding-cn 是 GLM Coding 包月订阅（5h 滚动窗口 + 周窗口），108 次评测调用会在窗口内计入使用量，与 prepaid 的 token 计费不同——**评测会临时占用生产可用额度**；本轮未在评测间加冷却，也未在结束后复核窗口读数，只按「不改预算、不并行」执行。
+2. **`glm-5.3-flash` 只代表 zai-coding-cn 一份**：opencode-go 的同名模型被跨渠道去重排除（§8.2）。同一模型 id 在不同渠道可能路由到不同端点/effort，因此 opencode-go 侧的能力与成本未经本轮证据覆盖。
+3. **vision 仍无数据**：两模型 vision 维恒 null（suite 设计如此），登记值（none / good）未获任何证据。
+4. **effort 仅 high**、题面仍是模板化合成题（同 §6.4–§6.7）；单维 13/13 刚好跨过 excellent 门槛（lb .7719），12/13 就掉回 good——一题决定档位。
+5. **world_knowledge 只作哨兵**：2/2 只证明判分器校准可信，不构成能力档。
+
+### 8.8 独立复核（JSONL 重算）
+
+- 脚本 `tmp/m52b-recount.mjs`（本会话新增、不进发布包）：自行实现 Wilson 公式（z=1.96）与聚合，只取 `status==='graded'`、哨兵不计、composite = 四维正确率均值。两份 JSONL 输出与工具结果**逐格一致**：glm-5.3 / glm-5.3-flash 均 `rows=54 graded=52 pass=52 composite=1.0000 lb=0.9312`，四维各 13/13（lb .7719）、哨兵 2/2、vision 0；`summary.json` 对比 `IDENTICAL`（`calls_executed=54`、`instrument_healthy=true`、effort=common）。
+- 写入面：仅 `model_eval["glm-5.3"]` / `model_eval["glm-5.3-flash"]`（`last_run`/scores/samples/composite/wilson_lb/suggest/evidence_refs）+ `eval_status{state=ok, run_id=eval-20261121-213654-90c8}`；`model_ratings` 块前后原样（`glm-5.3-flash` 仍 `coding: good` / `long_context: good` / `orchestration: good`，未被写成实测档），`channels[]` 的 tier/priority 未动。

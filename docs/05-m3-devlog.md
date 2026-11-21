@@ -1145,3 +1145,7 @@ run_id 与落盘（`C:\Users\sir_c\.dsh\mroute\eval-history\`）：
 3. 截断口径是否改为计入分母（本轮 0 截断，暂无影响；但 8192 后截断信号几乎消失，可考虑另设低预算对照）。
 4. 是否扩到 ≥20 题/维，让单维评级不受单题摆布。
 5. 是否回改 `docs/12` / devlog §23 的两处数字（本轮只记录、未改原文）。
+
+### 24.8 补测：包月渠道 GLM（2026-11-21 晚，+108 次）
+
+（§24.1 已被本轮原「需求与裁决」占用，故按顺序接排为 §24.8。）用户要求（2026-11-21 晚）补测包月渠道 GLM，且只要 `glm-5.3` 与 `glm-5.3-flash`（`glm-5.3-highspeed` 明确不跑，用户判断只是速度差异）。默认没测到是因为 `model_eval_run` 渠道白名单 prepaid-only（`plugin-mroute/lib/tool-eval-run.mjs:183-188`：voucher 一律排除、monthly 需 `allow_monthly:true`），GLM 两模型只在包月渠道（zai-coding-cn / opencode-go）。执行 = 两次单模型 invocation（各 `max_calls:60`，先 dry_run 核对 54 次与预算）：`eval-20261121-213304-6132`（glm-5.3，52/52、composite 1.0000、wilson_lb **.9312**、excellent；四维各 13/13 → 单维 lb .7719 excellent；哨兵 2/2；0 截断、0 invalid）与 `eval-20261121-213654-90c8`（glm-5.3-flash，同成绩；`opencode-go` 同名模型被跨渠道去重排除，只测 zai-coding-cn 一份）。两 run 均 `instrument_healthy=true`、`provisional=false`、effort=high；suggest `domestic_sota → overseas_sota`（+10）advisory 未应用，`model_ratings` / `channels[]` 零写入；`tmp/m52b-recount.mjs` 独立重算与工具输出逐格一致。**预算披露**：当日 368 + 108 = **476 次**，日预算经用户再次一次性放宽 400→**500**（`DAILY_CALL_BUDGET`，注释写明常规 300、M5.3 起回落；两次 dry_run 分别打印 368→422、422→476），旧证据未归档、计数未绕过。报告 `docs/13-model-eval-report-formal2.md` §8。

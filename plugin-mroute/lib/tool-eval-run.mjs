@@ -15,7 +15,7 @@
  *    哨兵 1024、vision 0），`max_tokens` 入参提供则覆盖全部可执行题（clamp 1..200000）；
  *    max_calls 默认 18 硬顶 80（与 runner.mjs HARD_MAX_CALLS 同源）、
  *    渠道白名单默认 prepaid（allow_monthly:true 才纳入包月；voucher 在 MVP 一律排除）、
- *    日预算 400 次（当日 eval-history 行数统计，超则拒跑）。
+ *    日预算 500 次（2026-11-21 两次一次性放宽：368+108=476；常规按 300，M5.3 起回落）。
  * 4. 不发任何出站 HTTP、不读密钥：所有模型流量经宿主 `ctx.llm.prepareCall/stream`（adapter 自带凭据）。
  * 5. effort 钉死：dry_run 阶段用 `ctx.llm.resolveModelInfo`（宿主本地能力查询）取各模型 efforts，
  *    取共同最高偏好档（优先 high）；取不到时不钉死，报告中显式标注（跨模型比较需谨慎）。
@@ -48,8 +48,11 @@ export const TOOL_NAME = 'model_eval_run'
  * 2026-11-21 当日 M5.1（4 run × 38 = 152 次）与本轮 formal/2（4 × 54 = 216 次）同日执行，
  * 合计 368 次 > 300；经 lead 裁决**仅本轮一次性放宽到 400**（证据不归档、计数不绕过），
  * 下一里程碑回落 300。见 devlog §24 与报告 §1 的披露。
+ * 2026-11-21 晚追加：用户要求补测包月渠道 GLM（glm-5.3 + glm-5.3-flash，各 54 次 = 108 次），
+ * 当日累计将达 368 + 108 = 476；经用户裁决再次一次性放宽到 500（同样不归档、不绕过计数）。
+ * 常规值仍应按 300 执行，M5.3 起回落。
  */
-export const DAILY_CALL_BUDGET = 400
+export const DAILY_CALL_BUDGET = 500
 /** `max_tokens` 覆盖参边界（任务书 §2.2）。 */
 export const MAX_TOKENS_MIN = 1
 export const MAX_TOKENS_MAX = 200000
