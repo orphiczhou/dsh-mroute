@@ -115,7 +115,7 @@ export function dayStamp(date = new Date()) {
 }
 
 /**
- * 当日已发生的调用数（计划 §9 L4：日预算 200 次/日，超则拒跑）。
+ * 当日已发生的调用数（预算由 tool-eval-run.DAILY_CALL_BUDGET 决定：常规 300，2026-11-21 一次性 400）。
  * 口径 = eval-history 下今天改动过的 *.jsonl 的非空行数之和（一行 = 一次真实调用）；
  * 读失败的文件跳过（宁可少算也不因历史坏文件拒绝本次评测——拒绝路径另有 dry_run 兜底）。
  * @returns {Promise<{ count:number, files:string[], day:string }>}

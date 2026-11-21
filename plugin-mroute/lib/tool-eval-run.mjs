@@ -1,9 +1,9 @@
 /**
- * model_eval_run 工具（M5-MVP / 计划 docs/10-m5-eval-plan.md）。
+ * model_eval_run 工具（M5-MVP / M5.1 / M5.2；计划 docs/10-m5-eval-plan.md，任务书 docs/briefs/m5.2-expand-eval.md）。
  *
- * 定位：在**对话内**跑一轮最小自动评测（suite lite/1，5 道可执行题 + 1 道恒 null 的 vision 占位），
- * 把证据写成 JSONL（<DSH_HOME>/mroute/eval-history/<run_id>.jsonl），把摘要写进配置
- * `model_eval[canonical]` 与 `eval_status`。
+ * 定位：在**对话内**跑一轮自动评测，把证据写成 JSONL（<DSH_HOME>/mroute/eval-history/<run_id>.jsonl），
+ * 把摘要写进配置 `model_eval[canonical]` 与 `eval_status`。
+ * 题集两档：lite/1（6 题，5 次调用）与 formal/2（55 题，54 次调用）。
  *
  * 默认 **dry_run:true**：只做预算/白名单/档位预检并渲染计划，**零调用、零写盘**。
  *
@@ -11,9 +11,11 @@
  * 1. 只写 `model_eval`（按统一模型名）与 `eval_status` 两个顶层字段；**永不写** channels[].tier /
  *    channels[].priority / model_ratings（suggest 只是面板展示的建议值，排序链不消费）。
  * 2. 不改 ranking.js / assembleRouteTable / 既有工具任何字节（本文件只读引用 rankChannels）。
- * 3. 成本闸：单题 maxTokens 来自题面（512/1024/256）、max_calls 默认 18 硬顶 40、
+ * 3. 成本闸：单题 maxTokens 来自题面分档（coding/orchestration 8192、tools/long_context 2048、
+ *    哨兵 1024、vision 0），`max_tokens` 入参提供则覆盖全部可执行题（clamp 1..200000）；
+ *    max_calls 默认 18 硬顶 80（与 runner.mjs HARD_MAX_CALLS 同源）、
  *    渠道白名单默认 prepaid（allow_monthly:true 才纳入包月；voucher 在 MVP 一律排除）、
- *    日预算 200 次（当日 eval-history 行数统计，超则拒跑）。
+ *    日预算 400 次（当日 eval-history 行数统计，超则拒跑）。
  * 4. 不发任何出站 HTTP、不读密钥：所有模型流量经宿主 `ctx.llm.prepareCall/stream`（adapter 自带凭据）。
  * 5. effort 钉死：dry_run 阶段用 `ctx.llm.resolveModelInfo`（宿主本地能力查询）取各模型 efforts，
  *    取共同最高偏好档（优先 high）；取不到时不钉死，报告中显式标注（跨模型比较需谨慎）。
@@ -41,8 +43,16 @@ import { canonicalOf } from './registry.js'
 import { errorMessage } from './errors.js'
 
 export const TOOL_NAME = 'model_eval_run'
-/** 日调用预算（计划 §9 L4：200 次/日，超则拒跑）。 */
-export const DAILY_CALL_BUDGET = 200
+/**
+ * 日调用预算（任务书 §2：200 → 300，M5.2 起）。
+ * 2026-11-21 当日 M5.1（4 run × 38 = 152 次）与本轮 formal/2（4 × 54 = 216 次）同日执行，
+ * 合计 368 次 > 300；经 lead 裁决**仅本轮一次性放宽到 400**（证据不归档、计数不绕过），
+ * 下一里程碑回落 300。见 devlog §24 与报告 §1 的披露。
+ */
+export const DAILY_CALL_BUDGET = 400
+/** `max_tokens` 覆盖参边界（任务书 §2.2）。 */
+export const MAX_TOKENS_MIN = 1
+export const MAX_TOKENS_MAX = 200000
 const MAX_MODELS_ARG = 10
 const CHANNEL_TYPE_VALUES = ['monthly', 'voucher', 'prepaid']
 const DIMENSION_STATUS_VALUES = ['graded', 'sentinel', 'invalid', 'null']
@@ -121,7 +131,20 @@ function validateArgs(args) {
     maxCalls = Math.min(HARD_MAX_CALLS, input.max_calls)
     if (maxCalls !== input.max_calls) notes.push(`max_calls 已收敛为硬顶 ${HARD_MAX_CALLS}`)
   }
-  return { models, limit, suite, dryRun, allowMonthly, maxCalls, notes }
+
+  // `max_tokens`：M5.2 覆盖参。语义 = **提供了就覆盖所有可执行题**（题面分档让位于显式入参），
+  // clamp 到 [1, 200000]；非法类型直接报错（校验先于任何 IO）。
+  let maxTokens = null
+  if (input.max_tokens !== undefined && input.max_tokens !== null) {
+    if (typeof input.max_tokens !== 'number' || !Number.isFinite(input.max_tokens)) {
+      throw new Error(`${TOOL_NAME}: max_tokens 参数非法：必须是 ${MAX_TOKENS_MIN}..${MAX_TOKENS_MAX} 的整数（收到 ${JSON.stringify(input.max_tokens)}）`)
+    }
+    const floored = Math.floor(input.max_tokens)
+    maxTokens = Math.min(MAX_TOKENS_MAX, Math.max(MAX_TOKENS_MIN, floored))
+    if (maxTokens !== input.max_tokens) notes.push(`max_tokens 已收敛为 ${maxTokens}（允许 ${MAX_TOKENS_MIN}..${MAX_TOKENS_MAX}）`)
+    notes.push(`max_tokens=${maxTokens} 覆盖全部可执行题（忽略题面分档）`)
+  }
+  return { models, limit, suite, dryRun, allowMonthly, maxCalls, maxTokens, notes }
 }
 
 /** 当前动态层（只读配置快照，供排序复现 M4.5 的 tight 沉底；不触发任何 quota 请求）。 */
@@ -266,16 +289,29 @@ function describeTarget(target) {
   return `${target.canonical}（${target.provider}/${target.model}, ${target.channel_type}${target.effort ? `, effort=${target.effort}` : ''}）`
 }
 
+/** 生效 maxTokens 分布文本：按维汇总（覆盖参生效时压成一条）。 */
+function describeMaxTokens(effectiveTasks, maxTokensOverride) {
+  if (maxTokensOverride !== null) return `max_tokens=${maxTokensOverride} 覆盖全部 ${effectiveTasks.length} 道可执行题`
+  const byDimension = new Map()
+  for (const task of effectiveTasks) {
+    const entry = byDimension.get(task.dimension) ?? { tokens: task.maxTokens, count: 0 }
+    entry.count += 1
+    byDimension.set(task.dimension, entry)
+  }
+  const order = [...DIMENSIONS, ...byDimension.keys()].filter((dim, index, list) => byDimension.has(dim) && list.indexOf(dim) === index)
+  return order.map((dim) => `${dim}=${byDimension.get(dim).tokens}×${byDimension.get(dim).count}`).join(' · ')
+}
+
 /** dry_run 文本：预算 + 白名单 + 将评测清单（可直接读，不写盘）。 */
-function renderPlan({ suite, runId, targets, excluded, effortNote, effortProblems, maxCalls, allowMonthly, daily, plannedCalls, notes }) {
+function renderPlan({ suite, runId, targets, excluded, effortNote, effortProblems, maxCalls, allowMonthly, daily, plannedCalls, effectiveTasks, maxTokensOverride, notes }) {
   const lines = []
   lines.push(`评测预检 · model eval / suite ${suite.version} · ${suite.graded.length} 道判分题 + ${suite.sentinels.length} 道校准哨兵（不计入 composite） + ${suite.nulls.length} 道恒 null · effort=${effortNote}`)
   lines.push(`渠道白名单：${allowMonthly ? 'prepaid + monthly(allow_monthly=true)' : 'prepaid（allow_monthly=false）'}；voucher 在 MVP 不参与`)
   lines.push(`将评测（${targets.length} 个统一模型名，跨渠道已去重）：`)
   for (const [index, target] of targets.entries()) lines.push(`  ${index + 1}. ${describeTarget(target)}`)
-  const perTaskTokens = suite.executable.map((task) => `${task.id}=${task.maxTokens}`).join(' · ')
-  lines.push(`预算：计划 ${plannedCalls} 次调用（上限 max_calls=${maxCalls}）· 单题 maxTokens（${suite.executable.length} 题）${perTaskTokens} · 单题超时 ${Math.round(DEFAULT_TIMEOUT_MS / 1000)}s · 串行`)
-  lines.push(`今日已调用 ${daily.count} 次（日预算 ${DAILY_CALL_BUDGET}${daily.count + plannedCalls > DAILY_CALL_BUDGET ? '，本轮预计超出 → 实跑会被拒绝' : ''}）`)
+  lines.push(`预算：计划 ${plannedCalls} 次调用（上限 max_calls=${maxCalls}）· 生效 maxTokens 分布：${describeMaxTokens(effectiveTasks, maxTokensOverride)} · 单题超时 ${Math.round(DEFAULT_TIMEOUT_MS / 1000)}s · 串行`)
+  const projected = daily.count + plannedCalls
+  lines.push(`今日已调用 ${daily.count} 次（日预算 ${DAILY_CALL_BUDGET}）· 本轮预计再调 ${plannedCalls} 次 → 当日累计 ${projected} 次${projected > DAILY_CALL_BUDGET ? '，超出日预算 → 实跑会被拒绝' : ''}`)
   if (excluded.length > 0) {
     lines.push(`排除：`)
     for (const line of excluded.slice(0, 8)) lines.push(`  - ${line}`)
@@ -288,9 +324,9 @@ function renderPlan({ suite, runId, targets, excluded, effortNote, effortProblem
 }
 
 /** 实跑文本：每模型分数/维度状态/finish 计数/suggest + 写回结论。 */
-function renderRun({ suite, runId, jsonlPath, summaryPath, instrumentHealthy, sentinel, callsExecuted, skipped, maxCalls, results, configWrite }) {
+function renderRun({ suite, runId, jsonlPath, summaryPath, instrumentHealthy, sentinel, callsExecuted, skipped, maxCalls, maxTokensOverride, results, configWrite }) {
   const lines = []
-  lines.push(`评测完成 · run ${runId} · suite ${suite.version} · 实调 ${callsExecuted} 次${skipped.length > 0 ? `（达到 max_calls=${maxCalls}，跳过 ${skipped.length} 题）` : ''}`)
+  lines.push(`评测完成 · run ${runId} · suite ${suite.version} · 实调 ${callsExecuted} 次${skipped.length > 0 ? `（达到 max_calls=${maxCalls}，跳过 ${skipped.length} 题）` : ''}${maxTokensOverride === null ? '' : ` · max_tokens=${maxTokensOverride}（覆盖全部可执行题）`}`)
   lines.push(`instrument_healthy=${instrumentHealthy}（判分器哨兵：${sentinel.ok ? `${suite.executable.length}/${suite.executable.length} 通过` : `破 → ${sentinel.issues.join('；')}`}）`)
   lines.push(`题集：${suite.graded.length} 道判分（计入 composite）+ ${suite.sentinels.length} 道校准哨兵（scores 留证据，不计入 composite/samples）+ ${suite.nulls.length} 道 vision 恒 null`)
   for (const result of results) {
@@ -419,11 +455,13 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
   return {
     name: TOOL_NAME,
     description:
-      '跑一轮最小模型自动评测（suite 缺省 lite/1：4 道判分题 + 1 道校准哨兵 + 1 道 vision 恒 null；'
-      + 'suite:"formal" 为 M5.1 正式卷 formal/1：coding 10 / tools 10 / long_context 10 / orchestration 6 判分题 + 2 道校准哨兵 + 1 道 vision 恒 null，共 38 次/模型）。'
+      '跑一轮模型自动评测（suite 缺省 lite/1：4 道判分题 + 1 道校准哨兵 + 1 道 vision 恒 null；'
+      + 'suite:"formal" 为 M5.2 正式卷 formal/2：coding 13 / tools 13 / long_context 13 / orchestration 13 判分题 + 2 道校准哨兵 + 1 道 vision 恒 null，共 54 次/模型）。'
       + '默认 dry_run:true 只预检不调用不写盘；dry_run:false 才真正串行调用宿主 llm 并写 '
       + '<DSH_HOME>/mroute/eval-history/<run_id>.jsonl 与配置 model_eval/eval_status。'
-      + '成本闸：单题 maxTokens 512（coding 1024）、max_calls 默认 18 硬顶 40、默认只测 prepaid 渠道、日预算 200 次。'
+      + '成本闸：单题 maxTokens 按维分档（coding/orchestration 8192、tools/long_context 2048、哨兵 1024），'
+      + 'max_tokens 入参提供则覆盖全部可执行题（clamp 1..200000）；max_calls 默认 18 硬顶 80、'
+      + `默认只测 prepaid 渠道、日预算 ${DAILY_CALL_BUDGET} 次（2026-11-21 M5.2 一次性放宽，常规 300）。`
       + '结果只作 advisory 建议值（suggest），不修改渠道排序字段。',
     parameters: {
       type: 'object',
@@ -432,7 +470,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
         suite: {
           type: 'string',
           enum: ['lite', 'formal'],
-          description: '题集版本：缺省 "lite"（M5-MVP 6 题）；"formal"（M5.1 正式卷，38 次/模型，需 max_calls≥38 才能单轮跑完单模型）。',
+          description: '题集版本：缺省 "lite"（M5-MVP 6 题）；"formal"（M5.2 正式卷 formal/2，54 次/模型，需 max_calls≥54 才能单轮跑完单模型）。',
         },
         models: {
           type: 'array',
@@ -455,6 +493,10 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
           type: 'integer',
           description: `本轮真实调用上限（缺省 ${DEFAULT_MAX_CALLS}，硬顶 ${HARD_MAX_CALLS}）。`,
         },
+        max_tokens: {
+          type: 'integer',
+          description: `覆盖全部可执行题的单题输出上限 ${MAX_TOKENS_MIN}..${MAX_TOKENS_MAX}（缺省用题面分档）；超出按边界收敛。`,
+        },
       },
     },
     output: {
@@ -469,6 +511,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
           allow_monthly: { type: 'boolean' },
           instrument_healthy: { type: 'boolean' },
           max_calls: { type: 'integer' },
+          max_tokens: { type: 'integer' },
           calls_planned: { type: 'integer' },
           calls_executed: { type: 'integer' },
           skipped_count: { type: 'integer' },
@@ -514,6 +557,11 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       const parsed = validateArgs(args)
       const suite = SUITES[parsed.suite]
       const notes = [...parsed.notes]
+      // M5.2：max_tokens 覆盖参——提供则替换全部可执行题的 maxTokens；
+      // 只改副本，不改题面对象本身（同一进程内 lite/formal 共用同一份 TASKS）。
+      const effectiveTasks = parsed.maxTokens === null
+        ? suite.executable
+        : suite.executable.map((task) => ({ ...task, maxTokens: parsed.maxTokens }))
 
       // ── 2) 注册表 + 活校验 + 动态层（本地配置/目录读取，零出站 HTTP）──────
       const registry = getRegistry()
@@ -537,7 +585,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       const effortResult = await resolveEfforts(ctx?.llm, targets)
       for (const problem of effortResult.problems) notes.push(problem)
 
-      const plannedCalls = targets.length * suite.executable.length
+      const plannedCalls = targets.length * effectiveTasks.length
       const sentinel = suite.sentinelCheck(suite.tasks)
       const daily = await countCallsToday({ dir: evalDir, logger })
       const runId = makeRunId()
@@ -547,6 +595,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
         allow_monthly: parsed.allowMonthly,
         instrument_healthy: sentinel.ok,
         max_calls: parsed.maxCalls,
+        ...(parsed.maxTokens === null ? {} : { max_tokens: parsed.maxTokens }),
         calls_planned: plannedCalls,
         effort_mode: effortResult.pinned.mode,
         effort_note: effortResult.pinned.note,
@@ -568,6 +617,8 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
           allowMonthly: parsed.allowMonthly,
           daily,
           plannedCalls,
+          effectiveTasks,
+          maxTokensOverride: parsed.maxTokens,
           notes,
         })
         return {
@@ -625,7 +676,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       const run = await runSuite({
         llm: ctx.llm,
         targets,
-        tasks: suite.executable,
+        tasks: effectiveTasks,
         maxCalls: parsed.maxCalls,
         timeoutMs: DEFAULT_TIMEOUT_MS,
         runId,
@@ -676,6 +727,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
         callsExecuted: run.calls.length,
         skipped: run.skipped,
         maxCalls: parsed.maxCalls,
+        maxTokensOverride: parsed.maxTokens,
         results: rows,
         configWrite,
       })

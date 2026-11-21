@@ -17,7 +17,12 @@ import { normalizeText } from './suite-lite.mjs'
 
 export const DEFAULT_TIMEOUT_MS = 60_000
 export const DEFAULT_MAX_CALLS = 18
-export const HARD_MAX_CALLS = 40
+/**
+ * max_calls 硬顶（M5.2：40 → 80）。
+ * formal/2 单模型 54 次调用，40 会截断 14 题；80 足以覆盖 54 且仍给手持余量。
+ * `tool-eval-run.mjs` 的入参 clamp 直接引用本常量（同源，禁各写一份）。
+ */
+export const HARD_MAX_CALLS = 80
 
 /** finish 白名单：tools 维允许工具调用收尾，其余维只认纯文本收尾。 */
 export const FINISH_WHITELIST = {

@@ -1078,3 +1078,70 @@ run_id 与落盘（`C:\Users\sir_c\.dsh\mroute\eval-history\`）：
 2. 截断是否计入分母（若「预算内答不完=能力不足」，需改 score 口径）。
 3. 4 条 `suggest.tier`（deepseek ×2 → overseas_sota；mimo ×2 → domestic_sota）均 advisory、未应用。
 4. 是否扩题量到 ≥13/维，让单维能出 excellent。
+
+## 24. M5.2 正式评测扩题（formal/2 + max_tokens 覆盖参 + 硬顶 80，2026-11-21）
+
+### 24.1 需求与裁决
+
+用户（任务书 `docs/briefs/m5.2-expand-eval.md`）：正式题集从 10 题/维扩到 ≥13 题/维（新 suite `formal/2`：52 判分 + 2 哨兵 + 1 vision = 54 次调用/模型）；maxTokens 分档复杂题 8192 / 常规 2048 / 哨兵 1024；新增 `max_tokens` 覆盖参（1..200000）；日预算 200→300；max_calls 硬顶 40→80；真跑 4 个 prepaid 模型；报告 `docs/13-model-eval-report-formal2.md`；版本 `0.11.0-m5.2`。
+
+**预算冲突与裁决**：当日（2026-11-21）`eval-history` 已有 M5.1 四个 run 共 **152 次**，本轮 4×54=**216 次** → 368 > 300，且第 3 个模型后计数 314 会硬拒第 4 个。执行侧提议 A 归档 M5.1 证据 / B 一次性放宽 / C 只跑 3 个；**lead 裁决 B**：`DAILY_CALL_BUDGET` 300→**400**（常量旁注释写明一次性、下一里程碑回落 300），M5.1 的 jsonl **原样保留**、不许绕过统计；报告 §1 与本节显式披露「当日实际 368 次、经 lead 裁决一次性放宽到 400、证据全部保留」；dry_run 的「今日已调用 N 次（日预算 M）」照实打印真实累计；`max_tokens` 语义定死「提供即覆盖所有可执行题」；冒烟 `plannedCalls` 不是 54/模型必须停下上报。
+
+**执行口径修正**：`max_calls` 是**单次 invocation 全局**上限（`runner.runSuite` 里 `calls.length >= maxCalls` 即跳过剩余题），所以 `{limit:4, max_calls:60}` 单次只跑 60 次（=第 1 模型 54 + 第 2 模型 6）。改为**4 次单模型运行**（各 `models:[单模型], max_calls:60`）→ 4 组 run_id、每次 54 次、合计 216；lead 确认（m00245），并追加纪律：串行、每模型 samples≥52×0.7=36.4、记录 max-tokens 题号、模型失败不顶替不自动重试。
+
+### 24.2 交付
+
+| 文件 | 变化 |
+|---|---|
+| `plugin-mroute/lib/eval/suite-formal.mjs` | `SUITE_VERSION='formal/2'`；55 题 = 52 判分（13/13/13/13）+ 2 哨兵 + 1 vision；导出 `MAX_TOKENS={coding:8192, orchestration:8192, tools:2048, long_context:2048, world_knowledge:1024, vision:0}`。新题：coding 3 道多步算法（countWays(15)=987、waysToMake(100)=242、3×3 螺旋遍历）、tools 3 道多参数抽取（send_email / book_meeting / query_order）、long_context 3 道 5 节文档跨节校验码（BK-771+HX-204 / FN-338+RC-905 / GH-612+DP-470，prompt ≤422 字）、orchestration 扩到 13 道（全部 JSON 数组 + id/name/deps 合法）。 |
+| `plugin-mroute/lib/tool-eval-run.mjs` | `DAILY_CALL_BUDGET=400`（含一次性放宽注释）；新增 `MAX_TOKENS_MIN=1` / `MAX_TOKENS_MAX=200000`；`validateArgs` 解析 `max_tokens`（非有限数字直接报 `max_tokens 参数非法：必须是 1..200000 的整数`，`Math.floor` 后 clamp 并记 note，校验先于任何 IO）；`execute` 用只读副本整体覆盖全部可执行题的 `maxTokens`（`plannedCalls`＝目标数×题数，`runSuite` 与 JSONL 记录同步）；`renderPlan` 打印「生效 maxTokens 分布」与真实累计预算行；`renderRun`/描述/参数/输出 schema 同步（单 type integer）。 |
+| `plugin-mroute/lib/eval/runner.mjs` | `HARD_MAX_CALLS` 40→**80**（注释说明 formal/2 54 次/模型；`tool-eval-run` 的 clamp 直接引用本常量）；`DEFAULT_MAX_CALLS` 仍 18。 |
+| `plugin-mroute/lib/eval/store.mjs` | 仅注释：预算由 `tool-eval-run.DAILY_CALL_BUDGET` 决定（常规 300，2026-11-21 一次性 400）。 |
+| `plugin-mroute/selfcheck/eval-formal.test.mjs` | 重写为 13 个 test：§F1 分布 55/54/52、§F2 maxTokens 分档、§F3 题型加厚、§F4 fixture 双向、§F5 取档公式、§F6 n=13 边界（13/13 excellent；10/10 只 good）、§F7 suite 计划 54 + 分布文本、§F8 `max_tokens` clamp（0→1 / 200001→200000 / 2.9→2 / 字符串报错）、§F9 硬顶 80 + 预算 400、§F10 实跑 samples=52、§F11 JSONL 54 行分档一致、§F12 覆盖实跑全落、§F13 schema 无 type 数组。 |
+| `plugin-mroute/package.json` | `0.10.0-m5.1` → **`0.11.0-m5.2`**（node 重写、无 BOM）。 |
+| `docs/13-model-eval-report-formal2.md` | 本轮报告（六段结构 + 验收自检）。 |
+| `AGENTS.md` §7 | 新增 M5.2 条目；M5.1 条目补一行数字勘误指针。 |
+
+### 24.3 真机执行
+
+- 热重载：`plugin_manager set_bundle @local/dsh-plugin-mroute` false→true 两轮 `application:"applied"`（Junction → `D:\Codes\DSH小插件\plugin-mroute`）。
+- 冒烟 dry_run `{suite:'formal', dry_run:true, limit:4}`：suite formal/2、4 个 prepaid 目标（deepseek-flash / deepseek-v4-pro / mimo-v2.6-flash / mimo-v2.6-pro）、**计划 216 次（54/模型）**、分布 **8192×26 · 2048×26 · 1024×2**、今日已调用 **152**、日预算 **400**、预计累计 **368**；排除 zai-coding-cn / opencode-go（monthly）与 deepseek-account 两条同名去重。
+- 实跑：4 次单模型串行，每次 `max_calls=60`，共 **216 次**（19:58–20:20，约 21 分钟）；4 组 `instrument_healthy=true`（判分器哨兵 54/54）。
+
+| 模型 | run_id | 调用 | samples | composite | wilson_lb | 总体档 | 截断 |
+|---|---|---|---|---|---|---|---|
+| deepseek-flash | `eval-20261121-195835-a529` | 54 | 52 | 1.0000 | 0.9312 | excellent | 0 |
+| deepseek-v4-pro | `eval-20261121-200112-d2e6` | 54 | 52 | 1.0000 | 0.9312 | excellent | 0 |
+| mimo-v2.6-flash | `eval-20261121-200652-f264` | 54 | 52 | 0.9231 | 0.8183 | excellent | 0 |
+| mimo-v2.6-pro | `eval-20261121-201435-55be` | 54 | 52 | 0.9615 | 0.8702 | excellent | 0 |
+
+逐维：deepseek 两模型四维全 13/13（lb .7719，excellent）；mimo-v2.6-flash 四维各 12/13（lb .6669，good；失败题 coding-11 / tools-11 / long_context-9 / orchestration-4）；mimo-v2.6-pro coding/lc/orch 13/13、tools 11/13（lb .5776，good；失败题 tools-3 / tools-8，两题均以文本作答、未发起工具调用）。当日累计 **368 次**（M5.1 152 + 本轮 216）≤ 400。
+
+### 24.4 自检与独立复核
+
+1. `npm.cmd run check` **exit 0**；`npm.cmd run selfcheck` **165/165 pass，0 fail**（duration ~4.0s）。
+2. 题集独立自证（`node` 直接 import `suite-formal.mjs`）：55 题 = 52 判分 + 2 哨兵 + 1 vision、13/13/13/13、54 次可执行、54 条 prompt 两两唯一、**52/52 fixture 双向 PASS**、`sentinelCheck().ok===true`。
+3. **JSONL 独立重算**（`tmp/m52-recount.mjs`）：四组 samples/composite/lb 与工具输出逐格一致（52/1.0000/.9312 ×2、52/0.9231/.8183、52/0.9615/.8702）；`tmp/m52-verify.mjs` 复核四份 `.summary.json` 的 `calls_executed=54`、`instrument_healthy=true`、`effort=common:high`、`scores`/`dimension_status` 与报告一致。
+4. **零耦合**：`git diff --stat` 对 `ranking.js` / `tool-query.js` / `tool-dispatch-plan.js` / `registry.js` / `capability-need.js` **为空**；`git status --short plugin-mroute` 仅 6 个预期文件（runner / store / suite-formal / tool-eval-run / package.json / eval-formal.test.mjs）。
+5. **未写能力配置**：`cordis.patch.yml:476-545` 的 `model_ratings` 原样（`mimo-v2.6-flash.coding` 仍为 `fair`，与实测 12/13 形成对照）；本轮写入仅 `model_eval.<canonical>`（585-714）与 `eval_status`（715-719）。
+
+### 24.5 与 formal/1 相比的结论变化
+
+1. **单维首次出现 excellent**：13/13 → lb **0.7719**（formal/1 的 10/10 只有 0.7225）。这是题量带来的分辨率提升，不是模型能力突变；但 12/13 → 0.6669 只能 good，**一题之差跨一档**。
+2. **v4-pro 的 max-tokens 截断消失**：formal/1 有 3 题（coding-2、coding-10、orchestration-2）答满 1024/512；formal/2 给 coding/orchestration 8192 后 **0/216 截断**。
+3. **mimo-v2.6-flash「orchestration 唯一弱项」不成立**：formal/2 四维各 12/13，orchestration 从 3/5 升到 12/13，失败分散（数值/参数/检索/结构各 1 题），更像抽样波动而非维度短板。
+4. **mimo-v2.6-pro 新增 tools 弱信号**：11/13（tools-3、tools-8 未发工具调用），与登记 `tools: excellent` 相反。
+5. **总体全部 excellent，区分度下降**：composite 0.92–1.00、lb .82–.93；若要区分模型应看**失分题型**而非总分。
+
+### 24.6 勘误（以 JSONL 为准，未改原文）
+
+- `docs/12` §2 与本节 §23 的 **mimo-v2.6-flash 总行**：`samples=35`、`composite=0.90` 正确，但 `p=0.9143`、`lb=0.7762`、总体档 `good` 有误——JSONL 实为 **33 pass / 35 graded** → p **0.9429**、lb **0.8139** → 按取档公式 **excellent**。`0.7762 / p=0.9143` 恰等于 **32/35**（统计时漏计 1 题）；`docs/12` §2 表自身（10/10、10/10、10/10、3/5）合计 33，与总行矛盾。按增补纪律不改上游原文，在此记录并写入报告 §5.6，是否回改 `docs/12` / §23 待用户裁决。
+- **Wilson 常数**：`docs/12` §3 与 §23 写的「13/13 lb=0.7655 / 12/12 lb=0.7423」与代码不符，实测为 **0.7719 / 0.7575**（`score.mjs wilsonLowerBound`，z=1.96）；任务书 §2.3 引用同源估算，报告 §3 已注明以代码为准。
+
+### 24.7 待用户裁决
+
+1. 是否把实测档回写 `model_ratings`（建议：人工登记=用户判断层、实测=机器证据层，并行展示不自动覆盖）。
+2. 4 条 `suggest.tier`（deepseek ×2 → overseas_sota；mimo ×2 → domestic_sota）是否采纳（均 advisory 未应用）。
+3. 截断口径是否改为计入分母（本轮 0 截断，暂无影响；但 8192 后截断信号几乎消失，可考虑另设低预算对照）。
+4. 是否扩到 ≥20 题/维，让单维评级不受单题摆布。
+5. 是否回改 `docs/12` / devlog §23 的两处数字（本轮只记录、未改原文）。

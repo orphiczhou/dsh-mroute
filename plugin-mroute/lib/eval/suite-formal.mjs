@@ -1,23 +1,49 @@
 /**
- * M5.1 正式评测题集 formal/1（任务书 docs/briefs/m5.1-formal-eval.md §2.4 定稿版）。
+ * M5.2 正式评测题集 formal/2（任务书 docs/briefs/m5.2-expand-eval.md §2.1 定稿版）。
  *
- * 题量（单模型 38 次调用）：
- *   coding 10 / tools 10 / long_context 10 / orchestration 6（均 graded，per-dim n=10/10/10/6）
- *   world_knowledge 2（校准哨兵，不计 composite）/ vision 1（恒 null、零调用）。
+ * 题量（单模型 54 次调用）：
+ *   coding 13 / tools 13 / long_context 13 / orchestration 13（均 graded，四维各 n=13）
+ *   world_knowledge 2（校准哨兵，不计 composite）/ vision 1（恒 null、零调用）
+ *   合计 55 题 → 可执行 54 题。
+ *
+ * maxTokens 分档（用户裁决 2026-11-21）：coding 8192 / orchestration 8192（复杂题）、
+ *   tools 2048 / long_context 2048（常规题）、哨兵 1024、vision 0；
+ *   另有 `model_eval_run.max_tokens` 覆盖参（1..200000）可把全部可执行题临时顶到 200k。
+ *
+ * 与 formal/1 的差异（M5.1 → M5.2）：
+ *   1. 题量：39 题（coding 10 / tools 10 / long_context 10 / orchestration 6 + 哨兵 2 + vision 1，
+ *     38 次调用/模型）→ 55 题（四维各 13 + 哨兵 2 + vision 1，54 次调用/模型），单维 n 达 13
+ *     以突破 Wilson 下界 excellent 门槛（13/13 时 lb=0.7655）。
+ *   2. maxTokens：1024（coding）/ 512（其余）/ 256（哨兵）→ 8192（coding、orchestration）/
+ *      2048（tools、long_context）/ 1024（哨兵）/ 0（vision）——formal/1 的 v4-pro 多题被 512
+ *      截断，本轮按维给足输出预算。
+ *   3. 题型加厚：coding ≥3 道多步算法（爬楼梯 DP / 硬币组合数 DP / 螺旋遍历，非单行答案）；
+ *      tools ≥4 道参数抽取（新增 3 道多参数抽取：收件人+主题 / 日期+会议室 / 订单号+手机号）；
+ *      long_context ≥3 道跨段检索（多节文档，两个校验码分处不同小节，prompt ≤1500 tokens）；
+ *      orchestration ≥4 道输出 JSON 计划（全部 13 道均为数组 ≥3 项 + deps 引用合法校验）。
  *
  * 纪律（与 suite-lite 同源，逐条沿用）：
  * 1. 确定性判分：grade(text/toolCalls/finishKind) 纯函数，禁 LLM judge、禁语义相似度。
  * 2. fixture 自证：每题 fixture_pass / fixture_fail 双向；任一破 → instrument_healthy=false（零模型调用）。
  * 3. vision 不测（skip=true）；world_knowledge 只作哨兵（sentinel=true，scores 留证据不计分）。
- * 4. 预算：单题 maxTokens ≤ 512（coding 1024）；prompt 内嵌长文本控制在 ~1500 tokens 内。
- * 5. 题面不依赖外网、不依赖长上下文文件；长文题 = 内嵌唯一 token 双点检索。
+ * 4. 题面不依赖外网、不依赖长上下文文件；长文题 = 内嵌唯一 token 双点检索。
  *
  * 工厂复用 suite-lite 的 normalizeText / extractJsonArray；sentinelCheck / gradeTask 按
  * lite 同形状自实现（二者是通用 task 形状函数，复制以保持模块自包含）。
  */
 import { normalizeText, extractJsonArray, DIMENSIONS } from './suite-lite.mjs'
 
-export const SUITE_VERSION = 'formal/1'
+export const SUITE_VERSION = 'formal/2'
+
+/** 单题输出上限分档（报告与自检共用；改这里等于改全部题面）。 */
+export const MAX_TOKENS = {
+  coding: 8192,
+  orchestration: 8192,
+  tools: 2048,
+  long_context: 2048,
+  world_knowledge: 1024,
+  vision: 0,
+}
 
 // ── 通用判分助手（与 suite-lite 同语义，模块自包含）──────────────────────────
 
@@ -38,24 +64,48 @@ function toolCallPass(out, { name, argKey, pattern }) {
   return { pass: false, detail: `未出现 ${name}(${argKey} 匹配 ${String(pattern)}) 的工具调用` }
 }
 
+/** 多参数工具调用判分：name 命中且所有关键参数都匹配（参数抽取题专用）。 */
+function toolCallMultiPass(out, { name, checks }) {
+  const calls = Array.isArray(out?.toolCalls) ? out.toolCalls : []
+  for (const call of calls) {
+    if (call?.name !== name) continue
+    let parsed
+    try {
+      parsed = JSON.parse(typeof call.args === 'string' && call.args !== '' ? call.args : '{}')
+    } catch {
+      continue
+    }
+    const misses = checks.filter((check) => typeof parsed?.[check.key] !== 'string' || !check.pattern.test(parsed[check.key]))
+    if (misses.length === 0) {
+      return { pass: true, detail: checks.map((check) => `${check.key}=${parsed[check.key]}`).join(' ') }
+    }
+  }
+  return { pass: false, detail: `未出现参数完整的 ${name} 调用（需要 ${checks.map((check) => check.key).join(' + ')}）` }
+}
+
 /** 数值边界匹配：避免 24 命中 240 的子串（normalizeText 已小写化）。 */
 function numberToken(value) {
   return new RegExp(`(^|[^0-9])${value}([^0-9]|$)`)
 }
 
-// ── coding × 10：函数名在场 + `// 结果: <值>` 数值/取值正确 ───────────────────
+// ── coding × 13：函数名在场 + `// 结果: <值>` 数值/取值正确 ───────────────────
+// 其中 coding-11/12/13 为多步算法题（DP / DP / 螺旋遍历），答案不是单行表达式可凑。
 
-function codingValueTask({ n, fn, problem, call, value, valuePattern }) {
+function codingValueTask({ n, fn, problem, call, value, valuePattern, multiStep = false }) {
   const pattern = valuePattern ?? numberToken(String(value).toLowerCase())
   return {
     id: `coding-${n}`,
     dimension: 'coding',
-    maxTokens: 1024,
+    maxTokens: MAX_TOKENS.coding,
+    multiStep,
     tools: null,
     prompt: [
       `用 JavaScript 写一个函数 \`${fn}\`。${problem}`,
+      multiStep
+        ? '必须写出可运行的完整实现（多步算法，不要只给一行公式或伪代码）。'
+        : '',
       `只输出一个代码块，不要解释。代码块最后一行用注释标注 ${call} 的实际计算结果，格式为 \`// 结果: <值>\`。`,
-    ].join('\n'),
+    ].filter((line) => line !== '').join('\n'),
     grade(out) {
       const text = normalizeText(out?.text)
       const hasFn = new RegExp(`\\b${fn}\\s*\\(`, 'i').test(text)
@@ -78,9 +128,28 @@ const CODING_TASKS = [
   codingValueTask({ n: 8, fn: 'gcd', problem: '用辗转相除法返回两个正整数的最大公约数。', call: 'gcd(48,18)', value: 6 }),
   codingValueTask({ n: 9, fn: 'toBinary', problem: '把非负整数转换成二进制字符串（不用前缀）。', call: 'toBinary(13)', value: '1101', valuePattern: /(^|[^01])1101([^01]|$)/ }),
   codingValueTask({ n: 10, fn: 'secondLargest', problem: '返回数组中第二大的**不同**元素。', call: 'secondLargest([4,9,2,7,9,5])', value: 7 }),
+  // ── formal/2 新增 3 道多步算法 ────────────────────────────────────────────
+  codingValueTask({
+    n: 11, fn: 'countWays', multiStep: true,
+    problem: '返回爬 n 级楼梯的方法数（每次可走 1 级或 2 级；请用循环或记忆化递推实现多步算法）。',
+    call: 'countWays(15)', value: 987,
+  }),
+  codingValueTask({
+    n: 12, fn: 'waysToMake', multiStep: true,
+    problem: '给定硬币面额 [1,5,10,25]，返回凑出指定金额 amount 的**组合数**（顺序不同算同一种；请用动态规划的多步实现）。',
+    call: 'waysToMake(100)', value: 242,
+  }),
+  codingValueTask({
+    n: 13, fn: 'spiralOrder', multiStep: true,
+    problem: '按顺时针螺旋顺序遍历 m×n 矩阵，返回一维数组（请用多步的边界收缩实现，不要硬编码示例）。',
+    call: 'spiralOrder([[1,2,3],[4,5,6],[7,8,9]])',
+    value: '1,2,3,6,9,8,7,4,5',
+    valuePattern: /1\s*,\s*2\s*,\s*3\s*,\s*6\s*,\s*9\s*,\s*8\s*,\s*7\s*,\s*4\s*,\s*5/,
+  }),
 ]
 
-// ── tools × 10：单工具声明 + 单轮工具调用（name + 关键参数匹配）───────────────
+// ── tools × 13：单轮工具调用（name + 关键参数匹配）─────────────────────────────
+// tools-1..10 单参数；tools-11..13 多参数抽取（≥4 道参数抽取要求由 10 单参 + 3 多参共同满足）。
 
 function toolsCallTask({ n, tool, toolDesc, argKey, argDesc, query, pattern, argValue }) {
   const spec = [
@@ -98,14 +167,41 @@ function toolsCallTask({ n, tool, toolDesc, argKey, argDesc, query, pattern, arg
   return {
     id: `tools-${n}`,
     dimension: 'tools',
-    maxTokens: 512,
+    maxTokens: MAX_TOKENS.tools,
     tools: spec,
     prompt: `请调用 ${tool} 工具${query}。只发起工具调用，不要输出任何解释文字。`,
     grade(out) {
       return toolCallPass(out, { name: tool, argKey, pattern })
     },
     fixture_pass: { text: '', toolCalls: [{ name: tool, args: JSON.stringify({ [argKey]: argValue }) }], finishKind: 'tool-calls' },
-    fixture_fail: { text: `好的，已为你查询（但没有发起工具调用）。`, toolCalls: [], finishKind: 'stop' },
+    fixture_fail: { text: '好的，已为你查询（但没有发起工具调用）。', toolCalls: [], finishKind: 'stop' },
+  }
+}
+
+function toolsMultiTask({ n, tool, toolDesc, props, query, checks, fixtureArgs }) {
+  const spec = [
+    {
+      name: tool,
+      description: toolDesc,
+      parameters: {
+        type: 'object',
+        properties: props,
+        required: Object.keys(props),
+        additionalProperties: false,
+      },
+    },
+  ]
+  return {
+    id: `tools-${n}`,
+    dimension: 'tools',
+    maxTokens: MAX_TOKENS.tools,
+    tools: spec,
+    prompt: `请调用 ${tool} 工具${query}。参数必须从原句里完整抽取，只发起工具调用，不要输出任何解释文字。`,
+    grade(out) {
+      return toolCallMultiPass(out, { name: tool, checks })
+    },
+    fixture_pass: { text: '', toolCalls: [{ name: tool, args: JSON.stringify(fixtureArgs) }], finishKind: 'tool-calls' },
+    fixture_fail: { text: '好的，我来处理（但没有发起工具调用）。', toolCalls: [], finishKind: 'stop' },
   }
 }
 
@@ -120,9 +216,41 @@ const TOOLS_TASKS = [
   toolsCallTask({ n: 8, tool: 'flight_status', toolDesc: '查询航班状态。', argKey: 'flight', argDesc: '航班号，例如 CA1234', query: '查询 CA1234 航班', argValue: 'CA1234', pattern: /ca[\s-]*1234/i }),
   toolsCallTask({ n: 9, tool: 'search_movie', toolDesc: '按片名搜索电影信息。', argKey: 'title', argDesc: '电影片名，例如 盗梦空间', query: '搜索电影「盗梦空间」', argValue: '盗梦空间', pattern: /盗梦空间|inception/i }),
   toolsCallTask({ n: 10, tool: 'sports_score', toolDesc: '查询球队最近比分。', argKey: 'team', argDesc: '球队名，例如 湖人', query: '查询湖人队最近比分', argValue: '湖人', pattern: /湖人|lakers/i }),
+  // ── formal/2 新增 3 道多参数抽取 ──────────────────────────────────────────
+  toolsMultiTask({
+    n: 11, tool: 'send_email', toolDesc: '发送一封电子邮件。',
+    props: {
+      to: { type: 'string', description: '收件人邮箱地址' },
+      subject: { type: 'string', description: '邮件主题' },
+    },
+    query: '给 alice@example.com 发一封主题为「周报」的邮件',
+    checks: [{ key: 'to', pattern: /alice@example\.com/i }, { key: 'subject', pattern: /周报/ }],
+    fixtureArgs: { to: 'alice@example.com', subject: '周报' },
+  }),
+  toolsMultiTask({
+    n: 12, tool: 'book_meeting', toolDesc: '预订一间会议室。',
+    props: {
+      date: { type: 'string', description: '会议日期，格式 YYYY-MM-DD' },
+      room: { type: 'string', description: '会议室编号，例如 A302' },
+    },
+    query: '把评审会订在 2026-12-05 的 A302 会议室',
+    checks: [{ key: 'date', pattern: /2026-12-05/ }, { key: 'room', pattern: /a302/i }],
+    fixtureArgs: { date: '2026-12-05', room: 'A302' },
+  }),
+  toolsMultiTask({
+    n: 13, tool: 'query_order', toolDesc: '查询订单的物流状态。',
+    props: {
+      order_id: { type: 'string', description: '订单号，例如 SN-88231' },
+      phone: { type: 'string', description: '下单手机号' },
+    },
+    query: '查询订单号 SN-88231 在手机号 13800001111 下的物流',
+    checks: [{ key: 'order_id', pattern: /sn-88231/i }, { key: 'phone', pattern: /13800001111/ }],
+    fixtureArgs: { order_id: 'SN-88231', phone: '13800001111' },
+  }),
 ]
 
-// ── long_context × 10：内嵌台账 + 双点唯一 token 检索 ─────────────────────────
+// ── long_context × 13：内嵌台账/文档 + 唯一 token 双点检索 ─────────────────────
+// long_context-1..10 同表双行检索；long_context-11..13 为跨段检索（多节文档，两码分处不同小节）。
 
 function lcCodeTask({ n, theme, header, rows, qA, qB, filler }) {
   const table = [header, '| --- | --- | --- |', ...rows.map((row) => `| ${row[0]} | ${row[1]} | ${row[2]} |`)].join('\n')
@@ -131,7 +259,7 @@ function lcCodeTask({ n, theme, header, rows, qA, qB, filler }) {
   return {
     id: `long_context-${n}`,
     dimension: 'long_context',
-    maxTokens: 512,
+    maxTokens: MAX_TOKENS.long_context,
     tools: null,
     prompt: [
       `下面是一份${theme}台账摘录，请仔细阅读后回答问题。`,
@@ -196,6 +324,33 @@ const LC_DATASETS = [
   },
 ]
 
+/** 跨段检索题：多节文档，两个校验码分处不同小节（prompt 内置，≤1500 tokens）。 */
+function lcSectionTask({ n, docTitle, sections, ask }) {
+  const body = sections.map((section) => `【${section.title}】\n${section.body}`).join('\n\n')
+  return {
+    id: `long_context-${n}`,
+    dimension: 'long_context',
+    maxTokens: MAX_TOKENS.long_context,
+    crossSection: true,
+    tools: null,
+    prompt: [
+      `下面是一份${docTitle}，全文共 ${sections.length} 节，请仔细阅读后回答问题。`,
+      '',
+      body,
+      '',
+      `问题：请找出「${ask.aTitle}」与「${ask.bTitle}」两节里的校验码，严格按 \`${ask.aLabel}=<码> ${ask.bLabel}=<码>\` 的格式只输出这一行，不要解释。`,
+    ].join('\n'),
+    grade(out) {
+      const text = normalizeText(out?.text)
+      const hasA = text.includes(ask.aCode.toLowerCase())
+      const hasB = text.includes(ask.bCode.toLowerCase())
+      return { pass: hasA && hasB, detail: `${ask.aLabel}=${hasA} ${ask.bLabel}=${hasB}` }
+    },
+    fixture_pass: { text: `${ask.aLabel}=${ask.aCode} ${ask.bLabel}=${ask.bCode}`, toolCalls: [], finishKind: 'stop' },
+    fixture_fail: { text: `${ask.aLabel}=${ask.wrongCode} ${ask.bLabel}=${ask.bCode}`, toolCalls: [], finishKind: 'stop' },
+  }
+}
+
 const LC_TASKS = [
   lcCodeTask({ n: 1, ...LC_DATASETS[0], qA: 0, qB: 5 }),
   lcCodeTask({ n: 2, ...LC_DATASETS[0], qA: 2, qB: 8 }),
@@ -207,9 +362,43 @@ const LC_TASKS = [
   lcCodeTask({ n: 8, ...LC_DATASETS[2], qA: 4, qB: 9 }),
   lcCodeTask({ n: 9, ...LC_DATASETS[3], qA: 1, qB: 5 }),
   lcCodeTask({ n: 10, ...LC_DATASETS[3], qA: 3, qB: 7 }),
+  // ── formal/2 新增 3 道跨段检索 ────────────────────────────────────────────
+  lcSectionTask({
+    n: 11, docTitle: '运维交接文档摘录',
+    sections: [
+      { title: '第一节 · 值班安排', body: '夜班从 22:00 开始，交接必须双人签字；值班表贴在机房门口，每周一更新；节假日按轮值表执行。' },
+      { title: '第二节 · 机房巡检', body: 'A 区空调温度上限 27℃；B 区湿度上限 65%；巡检记录写入台账，A 区记录的校验码是 HX-204。' },
+      { title: '第三节 · 备份策略', body: '数据库每日 02:00 全量备份，保留 14 天；增量备份每 4 小时一次；备份包完整性校验码是 BK-771。' },
+      { title: '第四节 · 告警处理', body: 'P1 告警 5 分钟内响应；P2 告警 30 分钟内响应；升级路径为值班 → 组长 → 架构组。' },
+      { title: '第五节 · 变更窗口', body: '生产变更只在周二与周四 20:00-23:00 进行；变更单必须提前一天提交并附回滚方案。' },
+    ],
+    ask: { aTitle: '备份策略', bTitle: '机房巡检', aLabel: '备份', bLabel: '巡检', aCode: 'BK-771', bCode: 'HX-204', wrongCode: 'BK-999' },
+  }),
+  lcSectionTask({
+    n: 12, docTitle: '财务对账规范摘录',
+    sections: [
+      { title: '第一节 · 月度对账', body: '每月 5 日前完成上月对账；差异超过 500 元必须写说明；2026-10 对账批次的校验码是 FN-338。' },
+      { title: '第二节 · 发票管理', body: '发票按项目归档；专用发票与普通发票分开放置；红冲发票需财务经理签字。' },
+      { title: '第三节 · 收款确认', body: '到账后 24 小时内确认收款；跨行到账以银行回单为准；回单校验码是 RC-905。' },
+      { title: '第四节 · 付款审批', body: '单笔 5 万元以下由部门经理审批；5 万元以上需财务总监审批；超预算付款另附说明。' },
+      { title: '第五节 · 档案保管', body: '凭证保存 10 年；电子档案每月做一次异地备份；调阅需登记。' },
+    ],
+    ask: { aTitle: '月度对账', bTitle: '收款确认', aLabel: '对账', bLabel: '收款', aCode: 'FN-338', bCode: 'RC-905', wrongCode: 'FN-999' },
+  }),
+  lcSectionTask({
+    n: 13, docTitle: '项目交接清单摘录',
+    sections: [
+      { title: '第一节 · 代码仓库', body: '主干分支保护开启；合并需两人评审；仓库镜像校验码是 GH-612。' },
+      { title: '第二节 · 部署环境', body: '生产环境变更走发布单；预发与生产配置差异必须逐条列出；发布包校验码是 DP-470。' },
+      { title: '第三节 · 监控告警', body: '核心接口错误率阈值 1%；告警群为 #ops-oncall；值班手机保持开机。' },
+      { title: '第四节 · 文档归档', body: '设计文档归档到知识库；接口文档随版本更新；过期文档标注归档日期。' },
+      { title: '第五节 · 遗留事项', body: '两项历史工单待关闭；交接清单需双方签字；遗留风险写进交接记录。' },
+    ],
+    ask: { aTitle: '代码仓库', bTitle: '部署环境', aLabel: '仓库', bLabel: '部署', aCode: 'GH-612', bCode: 'DP-470', wrongCode: 'GH-999' },
+  }),
 ]
 
-// ── orchestration × 6：计划 JSON 结构校验（id/name/deps 引用合法）────────────
+// ── orchestration × 13：计划 JSON 结构校验（id/name/deps 引用合法）────────────
 
 function orchPlanTask({ n, goal, count }) {
   const chain = Array.from({ length: count }, (_unused, index) => ({
@@ -220,7 +409,7 @@ function orchPlanTask({ n, goal, count }) {
   return {
     id: `orchestration-${n}`,
     dimension: 'orchestration',
-    maxTokens: 512,
+    maxTokens: MAX_TOKENS.orchestration,
     tools: null,
     prompt: [
       `把目标「${goal}」拆成 ${count} 个子任务。`,
@@ -260,6 +449,14 @@ const ORCH_TASKS = [
   orchPlanTask({ n: 4, goal: '搭建团队周报自动汇总系统', count: 4 }),
   orchPlanTask({ n: 5, goal: '给支付系统接入新的支付渠道', count: 4 }),
   orchPlanTask({ n: 6, goal: '建立用户反馈分类处理流程', count: 3 }),
+  // ── formal/2 新增 7 道 JSON 计划（≥4 道要求由全部 13 道满足）──────────────
+  orchPlanTask({ n: 7, goal: '把日志从文件迁移到集中式日志平台', count: 4 }),
+  orchPlanTask({ n: 8, goal: '给内部工具加上权限分级', count: 5 }),
+  orchPlanTask({ n: 9, goal: '为 API 增加限流与熔断', count: 4 }),
+  orchPlanTask({ n: 10, goal: '建立线上故障演练流程', count: 5 }),
+  orchPlanTask({ n: 11, goal: '重构前端构建流程以缩短发布耗时', count: 3 }),
+  orchPlanTask({ n: 12, goal: '把定时任务从单机改成分布式调度', count: 4 }),
+  orchPlanTask({ n: 13, goal: '为一个新功能补齐端到端测试', count: 5 }),
 ]
 
 // ── world_knowledge × 2（校准哨兵）+ vision × 1（恒 null）────────────────────
@@ -268,7 +465,7 @@ const SENTINEL_TASKS = [
   {
     id: 'world_knowledge-1',
     dimension: 'world_knowledge',
-    maxTokens: 256,
+    maxTokens: MAX_TOKENS.world_knowledge,
     tools: null,
     sentinel: true,
     prompt: '世界上最高的山峰是哪座？只回答山名，不要解释。',
@@ -283,7 +480,7 @@ const SENTINEL_TASKS = [
   {
     id: 'world_knowledge-2',
     dimension: 'world_knowledge',
-    maxTokens: 256,
+    maxTokens: MAX_TOKENS.world_knowledge,
     tools: null,
     sentinel: true,
     prompt: '中国的首都是哪座城市？只回答城市名，不要解释。',
@@ -300,7 +497,7 @@ const SENTINEL_TASKS = [
 const VISION_TASK = {
   id: 'vision-1',
   dimension: 'vision',
-  maxTokens: 0,
+  maxTokens: MAX_TOKENS.vision,
   tools: null,
   skip: true,
   prompt: '（不执行：本机无图像输入通道，vision 维度固定 null。）',
@@ -351,4 +548,4 @@ export function gradeTask(task, out) {
   }
 }
 
-export default { SUITE_VERSION, DIMENSIONS, TASKS, EXECUTABLE_TASKS, sentinelCheck, gradeTask }
+export default { SUITE_VERSION, MAX_TOKENS, DIMENSIONS, TASKS, EXECUTABLE_TASKS, sentinelCheck, gradeTask }

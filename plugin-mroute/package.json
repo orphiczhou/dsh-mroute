@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-plugin-mroute",
-  "version": "0.10.0-m5.1",
+  "version": "0.11.0-m5.2",
   "private": true,
   "description": "Model route advisor for DeepSeek Harness: finance-first channel ranking (monthly > voucher > prepaid) queried via model_route_query before dispatching subagents.",
   "type": "module",

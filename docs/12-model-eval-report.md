@@ -139,3 +139,15 @@ vision 维恒无数据（本轮零样本）；world_knowledge 只作哨兵，单
 - [x] 四模型结果落盘（4 run_id + model_eval 写回）
 - [x] 报告按 §2.3 结构落盘（本文件）
 - [x] 五核心文件 `git diff --stat` 为空（ranking.js / tool-query.js / tool-dispatch-plan.js / registry.js / capability-need.js）
+
+## 勘误（2026-11-21，M5.2 复核发现；不改动上文原文，改动另立此节）
+
+> 纪律：旧结论不静默改写。以下四处在 M5.2 用 JSONL 独立重算时发现与原表不一致，原文保留，以本节为准。
+
+1. **mimo-v2.6-flash（`eval-20261121-192341-671a`）总体数字错**：原文 §2 写 `samples 35 / composite 0.90 / wilson_lb 0.7762 / good`，JSONL 独立重算为 **`samples 35（graded 35，pass 33）/ composite 0.9429 / wilson_lb 0.8139 / excellent`**（0.7762 系按 32/35 计算，属笔误）。该模型**唯一实质弱项仍是 orchestration（3/5 + 1 invalid）**这一结论不变。
+2. **Wilson 下界数值微差**：原文引用的 `.7655`（13/13）与 `.7423`（12/12）是近似值，实测 **13/13 → 0.7719**、**12/12 → 0.7575**（同一 Wilson 95% 单侧公式）。不影响任何取档结论。
+3. **`eval-20261121-192341-671a` 的截断数**：原文把 mimo-flash 记为无截断，实际有 **1 题 `max-tokens`**（orchestration-2），与 v4-pro 的 3 题同属「输出闸过低」而非能力问题。
+4. **结论方向**：上述更正后，M5.1 四个模型里 **三个 excellent、一个 good** 变为 **四个全部 excellent**；「区分度不足」的判断因此更早出现（M5.2 已据此提出 ≥20 题/维或加权评分）。
+
+证据：`C:\Users\sir_c\.dsh\mroute\eval-history\eval-20261121-192341-671a.jsonl`（38 行，逐行 `dimension`/`status`/`pass` 重算）。重算脚本口径与 `plugin-mroute/lib/eval/score.mjs` 一致（只聚合 `status==='graded'`，sentinel 不计入）。
+
