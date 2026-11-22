@@ -1159,3 +1159,11 @@ run_id 与落盘（`C:\Users\sir_c\.dsh\mroute\eval-history\`）：
 - 报告：`docs/13-model-eval-report-formal2.md` 追加 **§9**（9.1 需求 / 9.2 执行 / 9.3 结果 / 9.4 独立复核 / 9.5 七模型对比表 / 9.6 评测体系归档声明）。
 - **归档结论**：`formal/2` 题集 + 判分器 + 取档门槛冻结；只在**新模型加入注册表**时复用，不重跑已有模型、不改题集/门槛/`max_tokens` 分档；写回政策 = 评测只写 `model_eval`/`eval_status`，`model_ratings` 与 `tier`/`priority` **由用户手工维护**（`suggest` 仅参考）。
 - orb：用户裁决**本轮不改浮球**（D1 = 停用 quota 后 5 分钟内不退回账号余额），已在 `AGENTS.md` §10 记为「计划待启」。
+
+### 24.10 GLM 套餐归属提示与 highspeed 下架调整（2026-11-22）
+
+- 用户指令：「GLM的套餐是最高档的Max，你去查下用量……用GLM模型，优先用他套餐里面的」→ 实测 quota：`zhipu`「智谱 Coding Plan · max」5h 窗口已用 2%、本周窗口已用 15%、搜索/工具额度剩 3510、账户余额 ¥0.94（未动）、累计消费 ¥140。判定：`zai-coding-cn` 渠道即套餐通道，其 `models[]` 内的 glm-5.3 / glm-5.3-flash 走套餐窗口计量，不消耗 ¥ 余额（旁证：2026-11-21 晚 108 次 GLM 评测令本周窗口 14%→15%，而账户余额始终 ¥0.94）。
+- 用户追加裁决：「好，加个提示吧。另外 glm-5.3-highspeed 没法用，被我去掉了，你调整下。」→ 用户已在 DSH provider 目录下架 `zai-coding-cn/glm-5.3-highspeed`（`list_subagent_models` 现仅 `glm-5.3`、`glm-5.3-flash`）。
+- 我在 `C:\Users\sir_c\.dsh\profiles\desktop\cordis.patch.yml` 做了三处定向编辑（未重排 YAML，纯行级）：①`channels[zai-coding-cn].models` 去掉 `- glm-5.3-highspeed`；②同渠道 `manual.note` 改为「GLM Coding Plan Max：glm-5.3/glm-5.3-flash 走套餐窗口（不耗 ¥ 余额）；glm-5.3-highspeed 已于 2026-11-22 从 DSH 目录下架」；③删除 `model_ratings.glm-5.3-highspeed` 整块（6 维，已无对应模型）；另删除宿主 `subagent-model-selection-settings.allowedModels` 里残留的 `zai-coding-cn/glm-5.3-highspeed` 一项。
+- 复核（无需 reload，配置即时生效）：`model_route_query` 显示 zai `models=[glm-5.3, glm-5.3-flash]`、备注里出现上述提示、余额 `machine(5h 3% · 本周 15%)`；`model_route_sync_models`（dry-run）五渠道全部「一致」——证明下架后 `models[]` 与 DSH 目录对齐。
+- 备注：`model_ratings.glm-5.3-highspeed` 的档位随块删除（若该模型日后回归需重新登记）；本次只改用户 profile 配置与文档，插件代码零改动。
