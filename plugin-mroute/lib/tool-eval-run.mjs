@@ -15,7 +15,7 @@
  *    哨兵 1024、vision 0），`max_tokens` 入参提供则覆盖全部可执行题（clamp 1..200000）；
  *    max_calls 默认 18 硬顶 80（与 runner.mjs HARD_MAX_CALLS 同源）、
  *    渠道白名单默认 prepaid（allow_monthly:true 才纳入包月；voucher 在 MVP 一律排除）、
- *    日预算 500 次（2026-11-21 两次一次性放宽：368+108=476；常规按 300，M5.3 起回落）。
+ *    日预算 300 次（2026-11-21 M5.2 当日曾两次一次性放宽至 400/500 以跑完 476 次；2026-11-22 起回落常规 300）。
  * 4. 不发任何出站 HTTP、不读密钥：所有模型流量经宿主 `ctx.llm.prepareCall/stream`（adapter 自带凭据）。
  * 5. effort 钉死：dry_run 阶段用 `ctx.llm.resolveModelInfo`（宿主本地能力查询）取各模型 efforts，
  *    取共同最高偏好档（优先 high）；取不到时不钉死，报告中显式标注（跨模型比较需谨慎）。
@@ -52,7 +52,7 @@ export const TOOL_NAME = 'model_eval_run'
  * 当日累计将达 368 + 108 = 476；经用户裁决再次一次性放宽到 500（同样不归档、不绕过计数）。
  * 常规值仍应按 300 执行，M5.3 起回落。
  */
-export const DAILY_CALL_BUDGET = 500
+export const DAILY_CALL_BUDGET = 300
 /** `max_tokens` 覆盖参边界（任务书 §2.2）。 */
 export const MAX_TOKENS_MIN = 1
 export const MAX_TOKENS_MAX = 200000
@@ -464,7 +464,7 @@ export function createEvalRunTool({ ctx, getRegistry, livecheck, logger, readCon
       + '<DSH_HOME>/mroute/eval-history/<run_id>.jsonl 与配置 model_eval/eval_status。'
       + '成本闸：单题 maxTokens 按维分档（coding/orchestration 8192、tools/long_context 2048、哨兵 1024），'
       + 'max_tokens 入参提供则覆盖全部可执行题（clamp 1..200000）；max_calls 默认 18 硬顶 80、'
-      + `默认只测 prepaid 渠道、日预算 ${DAILY_CALL_BUDGET} 次（2026-11-21 M5.2 一次性放宽，常规 300）。`
+      + `默认只测 prepaid 渠道、日预算 ${DAILY_CALL_BUDGET} 次（2026-11-21 M5.2 当日曾一次性放宽，2026-11-22 起回落）。`
       + '结果只作 advisory 建议值（suggest），不修改渠道排序字段。',
     parameters: {
       type: 'object',

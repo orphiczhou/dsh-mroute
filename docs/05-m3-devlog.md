@@ -1149,3 +1149,13 @@ run_id 与落盘（`C:\Users\sir_c\.dsh\mroute\eval-history\`）：
 ### 24.8 补测：包月渠道 GLM（2026-11-21 晚，+108 次）
 
 （§24.1 已被本轮原「需求与裁决」占用，故按顺序接排为 §24.8。）用户要求（2026-11-21 晚）补测包月渠道 GLM，且只要 `glm-5.3` 与 `glm-5.3-flash`（`glm-5.3-highspeed` 明确不跑，用户判断只是速度差异）。默认没测到是因为 `model_eval_run` 渠道白名单 prepaid-only（`plugin-mroute/lib/tool-eval-run.mjs:183-188`：voucher 一律排除、monthly 需 `allow_monthly:true`），GLM 两模型只在包月渠道（zai-coding-cn / opencode-go）。执行 = 两次单模型 invocation（各 `max_calls:60`，先 dry_run 核对 54 次与预算）：`eval-20261121-213304-6132`（glm-5.3，52/52、composite 1.0000、wilson_lb **.9312**、excellent；四维各 13/13 → 单维 lb .7719 excellent；哨兵 2/2；0 截断、0 invalid）与 `eval-20261121-213654-90c8`（glm-5.3-flash，同成绩；`opencode-go` 同名模型被跨渠道去重排除，只测 zai-coding-cn 一份）。两 run 均 `instrument_healthy=true`、`provisional=false`、effort=high；suggest `domestic_sota → overseas_sota`（+10）advisory 未应用，`model_ratings` / `channels[]` 零写入；`tmp/m52b-recount.mjs` 独立重算与工具输出逐格一致。**预算披露**：当日 368 + 108 = **476 次**，日预算经用户再次一次性放宽 400→**500**（`DAILY_CALL_BUDGET`，注释写明常规 300、M5.3 起回落；两次 dry_run 分别打印 368→422、422→476），旧证据未归档、计数未绕过。报告 `docs/13-model-eval-report-formal2.md` §8。
+
+### 24.9 qwen3.8-flash 补测与评测体系归档（2026-11-22）
+
+- 用户指令：「qwen 3.8 flash也要测试，测试对比表格发我看，我来自己解读后手工维护。测试题目规模够了，测试体系存档，后面有新模型加入时候再测试。浮动球不改，记录计划等待后续启动。」
+- 预算先回落：`plugin-mroute/lib/tool-eval-run.mjs` 的 `DAILY_CALL_BUDGET` 500 → **300**（2026-11-21 的 400/500 属当日一次性放宽，常量注释已写明）；`selfcheck/eval-formal.test.mjs` §F9 断言同步改回 300；`selfcheck` 165/165。
+- 真跑：`model_eval_run { suite:'formal', models:['qwen3.8-flash'], allow_monthly:true, max_calls:60, dry_run:false }` → run `eval-20261122-091501-adda`，实调 54 次；**52/52、composite 1.0000、Wilson LB .9312、excellent**，四维各 13/13（lb .7719），0 截断 / 0 invalid，instrument_healthy=true、provisional=false、effort=high。
+- lead 独立重算该 JSONL：`graded=52 / pass=52 / composite=1.0000 / lb=0.9312`，四维各 `13/13 · lb .7719`、`skipped=0`，与工具输出逐格一致；零耦合 diff 为空；`model_ratings` 未被写。
+- 报告：`docs/13-model-eval-report-formal2.md` 追加 **§9**（9.1 需求 / 9.2 执行 / 9.3 结果 / 9.4 独立复核 / 9.5 七模型对比表 / 9.6 评测体系归档声明）。
+- **归档结论**：`formal/2` 题集 + 判分器 + 取档门槛冻结；只在**新模型加入注册表**时复用，不重跑已有模型、不改题集/门槛/`max_tokens` 分档；写回政策 = 评测只写 `model_eval`/`eval_status`，`model_ratings` 与 `tier`/`priority` **由用户手工维护**（`suggest` 仅参考）。
+- orb：用户裁决**本轮不改浮球**（D1 = 停用 quota 后 5 分钟内不退回账号余额），已在 `AGENTS.md` §10 记为「计划待启」。

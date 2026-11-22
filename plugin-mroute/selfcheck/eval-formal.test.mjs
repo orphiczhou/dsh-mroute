@@ -11,7 +11,7 @@
  *  ⑥ n=13 全对时 Wilson 下界跨过 0.75（excellent 门槛）；
  *  ⑦ suite 缺省仍为 lite（5 次/模型）；formal 计划 54 次/模型（dry_run 零调用）；
  *  ⑧ `max_tokens` 覆盖参 clamp（0→1、200001→200000、非整数收敛、非法类型报错）；
- *  ⑨ `max_calls` 硬顶 80、日预算 500（2026-11-21 晚补测 GLM 时 400→500 一次性放宽）；
+ *  ⑨ `max_calls` 硬顶 80、日预算 300（2026-11-21 M5.2 当日曾放宽到 400/500，2026-11-22 回落）；
  *  ⑩ formal 实跑（oracle 全对）：samples=52、tool-calls=13、哨兵不计入、不写 channels/model_ratings；
  *  ⑪ 实跑 JSONL 每题 max_tokens 与题面分档一致（54 行）；
  *  ⑫ `max_tokens` 覆盖实跑：54 行全部落到覆盖值；
@@ -249,15 +249,15 @@ test('§F8 max_tokens 覆盖参：0→1、200001→200000、2.9→2、非法类�
   assert.equal(llm.calls.length, 0)
 })
 
-test('§F9 max_calls 硬顶 80 与日预算 500（2026-11-21 晚补测再放宽）', async () => {
+test('§F9 max_calls 硬顶 80 与日预算 300（2026-11-22 回落常规值）', async () => {
   assert.equal(DEFAULT_MAX_CALLS, 18)
   assert.equal(HARD_MAX_CALLS, 80)
-  assert.equal(DAILY_CALL_BUDGET, 500)
+  assert.equal(DAILY_CALL_BUDGET, 300)
   const { tool } = evalTool()
   const plan = await tool.execute({ suite: 'formal', max_calls: 100 }, EXEC)
   assert.equal(plan.max_calls, 80)
   assert.match(plan.text, /max_calls 已收敛为硬顶 80/)
-  assert.match(plan.text, /日预算 500/)
+  assert.match(plan.text, /日预算 300/)
 })
 
 test('§F10 formal 实跑（oracle 全对）：samples=52、tool-calls=13、哨兵不计入、不写 channels/model_ratings', async () => {

@@ -277,3 +277,63 @@ p = passed/n；lb = Wilson 95% 下界（z=1.96，`lib/eval/score.mjs wilsonLower
 
 - 脚本 `tmp/m52b-recount.mjs`（本会话新增、不进发布包）：自行实现 Wilson 公式（z=1.96）与聚合，只取 `status==='graded'`、哨兵不计、composite = 四维正确率均值。两份 JSONL 输出与工具结果**逐格一致**：glm-5.3 / glm-5.3-flash 均 `rows=54 graded=52 pass=52 composite=1.0000 lb=0.9312`，四维各 13/13（lb .7719）、哨兵 2/2、vision 0；`summary.json` 对比 `IDENTICAL`（`calls_executed=54`、`instrument_healthy=true`、effort=common）。
 - 写入面：仅 `model_eval["glm-5.3"]` / `model_eval["glm-5.3-flash"]`（`last_run`/scores/samples/composite/wilson_lb/suggest/evidence_refs）+ `eval_status{state=ok, run_id=eval-20261121-213654-90c8}`；`model_ratings` 块前后原样（`glm-5.3-flash` 仍 `coding: good` / `long_context: good` / `orchestration: good`，未被写成实测档），`channels[]` 的 tier/priority 未动。
+
+## 9. 补测：qwen3.8-flash（2026-11-22，opencode-go 包月渠道）
+
+### 9.1 需求
+
+用户在 GLM 补测后追加要求：「qwen 3.8 flash也要测试，测试对比表格发我看，我来自己解读后手工维护。测试题目规模够了，测试体系存档，后面有新模型加入时候再测试。浮动球不改，记录计划等待后续启动。」
+
+### 9.2 执行
+
+- 调用：`model_eval_run { suite:'formal', models:['qwen3.8-flash'], allow_monthly:true, max_calls:60, dry_run:false }`。
+- 渠道：`opencode-go`（monthly，故必须 `allow_monthly:true`）；统一模型名 `qwen3.8-flash`，无跨渠道重复。
+- 日预算：本轮前已把 `DAILY_CALL_BUDGET` 由 500 回落为 **300**（2026-11-21 的 400/500 属当日一次性放宽，注释与 `selfcheck/eval-formal.test.mjs` §F9 一并改回）；本日（2026-11-22）调用 54 次。
+- run_id：`eval-20261122-091501-adda`；证据 `C:\Users\sir_c\.dsh\mroute\eval-history\eval-20261122-091501-adda.jsonl`。
+
+### 9.3 结果
+
+| 项 | 值 |
+|---|---|
+| 判分 | **52 / 52** |
+| composite | **1.0000** |
+| Wilson 95% LB | **0.9312** |
+| 档 | **excellent**（`provisional=false`、`instrument_healthy=true`、effort=high） |
+| 四判分维 | coding 13/13 · tools 13/13 · long_context 13/13 · orchestration 13/13（各 lb .7719） |
+| 哨兵 | world_knowledge 2/2（不计入 composite）· vision 恒 null |
+| finish | stop=41 · tool-calls=13 · max-tokens=0 · error=0 · aborted=0 |
+| suggest | `tier=overseas_sota`(+10)，相对当前 `domestic_sota`；advisory，未应用 |
+
+### 9.4 独立复核（JSONL 重算）
+
+用自写脚本重算 `eval-20261122-091501-adda.jsonl`（只聚合 `status==='graded'`、排除哨兵，自行实现 Wilson z=1.96）：`graded=52 / pass=52 / composite=1.0000 / lb=0.9312`，四维各 `13/13 · lb .7719`，`skipped=0` —— 与工具输出逐格一致。零耦合：`lib/{ranking,tool-query,tool-dispatch-plan,registry,capability-need}.js` diff 为空；`model_ratings` 未被写。
+
+### 9.5 七模型对比表（formal/2 口径，52 判分题）
+
+| 排名 | 统一模型名 | 渠道 / 付费类型 | 判分 | composite | Wilson LB | 档 | 唯一失分点 |
+|---|---|---|---|---|---|---|---|
+| 1 | deepseek-flash | deepseek-official / prepaid | 52/52 | 1.0000 | .9312 | excellent | — |
+| 1 | deepseek-v4-pro | deepseek-official / prepaid | 52/52 | 1.0000 | .9312 | excellent | — |
+| 1 | glm-5.3 | zai-coding-cn / monthly | 52/52 | 1.0000 | .9312 | excellent | — |
+| 1 | glm-5.3-flash | zai-coding-cn / monthly | 52/52 | 1.0000 | .9312 | excellent | — |
+| 1 | qwen3.8-flash | opencode-go / monthly | 52/52 | 1.0000 | .9312 | excellent | — |
+| 6 | mimo-v2.6-pro | xiaomi / prepaid | 50/52 | .9615 | .8702 | excellent | tools 11/13 |
+| 7 | mimo-v2.6-flash | xiaomi / prepaid | 48/52 | .9231 | .8183 | excellent | coding/tools/lc/orch 各 12/13 |
+
+**读表要点（供人工维护参考，不构成裁决）**
+
+1. **区分度已耗尽**：5 个模型并列第一（52/52），第 6/7 名只差 1–2 题；`excellent` 门槛（lb ≥ .75 且 p ≥ .92）在 13 题/维下几乎只区分「全对」与「错 ≥2 题」。要继续拉开差距需 ≥20 题/维（用户已决定「题目规模够了」，故本轮为归档终态）。
+2. **单维 13/13 的 Wilson 下界只有 .7719**，12/13 掉到 .6756（→ good）：一题之差决定档位，跨模型比较应以「总 composite + 总 LB」为主。
+3. **glm-5.3-flash 的手工登记偏保守**：登记 coding/long_context/orchestration 为 `good`，实测三维全 excellent（13/13）。是否回写由用户决定（本轮未写）。
+4. **vision 维全部无数据**（suite 设计为恒 null），登记值（none/good/fair）无任何实测证据。
+5. **world_knowledge 只作哨兵**（2/2 仅证明判分器校准可信），不构成能力档。
+6. lite/1 时期的历史 run（deepseek-v4-pro 33 题含 3 处截断、mimo-pro 36、mimo-flash 33/35）与本表**不可直接比较**，仅作趋势参考；其数字见 §2–§4 与 §9.5 勘误。
+
+### 9.6 评测体系归档声明（2026-11-22）
+
+用户裁决：「测试题目规模够了，测试体系存档，后面有新模型加入时候再测试。」据此冻结：
+
+- **冻结对象**：`suite formal/2`（`plugin-mroute/lib/eval/suite-formal.mjs`，`SUITE_VERSION='formal/2'`，55 题 → 54 次/模型）+ 判分器（`lib/eval/score.mjs`：Wilson、`suggestRating`、`six-dimension` 语义）+ 取档门槛（excellent lb≥.75 且 p≥.92 / good lb≥.55 / fair p≥.30 / none p<.30 / 无数据 n<6）。
+- **复用条件**：**仅当有新模型加入注册表时**运行 `model_eval_run { suite:'formal', allow_monthly:<按渠道>, max_calls:60 }`；不复跑已有模型，不改题集、不改门槛、不改 `max_tokens` 分档（coding/orchestration 8192、tools/long_context 2048、world_knowledge 1024、vision 0）。
+- **写回政策**：评测只写 `model_eval` / `eval_status`；`model_ratings`（六维能力档）与 `tier`/`priority` **一律由用户手工维护**，`suggest` 输出仅作参考（advisory-only）。
+- **证据留存**：`C:\Users\sir_c\.dsh\mroute\eval-history\eval-*.jsonl` + 本报告 §2–§9。
