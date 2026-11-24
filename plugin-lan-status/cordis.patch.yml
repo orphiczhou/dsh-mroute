@@ -1,0 +1,6 @@
+- insert:
+    - id: lan-status
+      name: '@local/dsh-lan-status'
+      config:
+        serve: false
+        panelUrl: 'http://192.168.3.23:3091'

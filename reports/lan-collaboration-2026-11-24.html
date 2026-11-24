@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>局域网多机 DSH 协作 · 阶段性结案 · 2026-11-24</title>
+<script>
+(function () {
+  var root = document.documentElement;
+  root.className += ' js';
+  try {
+    var m = localStorage.getItem('html-explainer-theme');
+    if (m === 'light' || m === 'dark') root.setAttribute('data-theme', m);
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --ink:#17212f; --ink2:#33414f; --muted:#67737f;
+    --line:#e1e7ee; --line2:#cfd8e3;
+    --brand:#2f6fed; --soft:#eaf1ff;
+    --ok:#177a4c; --ok-soft:#e7f6ee; --ok-line:#b7e0c9;
+    --warn:#9a5b00; --warn-soft:#fff4e2; --warn-line:#f0d9ad;
+    --bad:#b42318; --bad-soft:#fdeceb; --bad-line:#f3c9c4;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 10px 26px rgba(16,24,40,.06);
+    --radius:16px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  html[data-theme="dark"]{
+    --bg:#0e1520; --card:#151f2c; --ink:#e8eef7; --ink2:#c3d0e0; --muted:#9bacbf;
+    --line:#243141; --line2:#314156;
+    --brand:#6ea1ff; --soft:#1a2740;
+    --ok:#58d29a; --ok-soft:#122a20; --ok-line:#24503c;
+    --warn:#f0b45a; --warn-soft:#2a2010; --warn-line:#574221;
+    --bad:#ff8a80; --bad-soft:#2c1614; --bad-line:#5a2b27;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: dark){
+    html:not([data-theme="light"]){
+      --bg:#0e1520; --card:#151f2c; --ink:#e8eef7; --ink2:#c3d0e0; --muted:#9bacbf;
+      --line:#243141; --line2:#314156;
+      --brand:#6ea1ff; --soft:#1a2740;
+      --ok:#58d29a; --ok-soft:#122a20; --ok-line:#24503c;
+      --warn:#f0b45a; --warn-soft:#2a2010; --warn-line:#574221;
+      --bad:#ff8a80; --bad-soft:#2c1614; --bad-line:#5a2b27;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:64px}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.72;font-size:16px;
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+    -webkit-font-smoothing:antialiased;transition:background .18s,color .18s}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+  h1,h2,h3,h4{margin:0;line-height:1.32}
+  h2{font-size:25px}h3{font-size:18px}
+  p{margin:.55em 0}
+  a{color:var(--brand);text-decoration:none}
+  code{font-family:var(--mono);font-size:.87em;background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 5px;word-break:break-all}
+  .muted{color:var(--muted)}
+  .small{font-size:13.4px}
+
+  .topbar{position:sticky;top:0;z-index:30;backdrop-filter:blur(8px);
+    background:color-mix(in srgb, var(--card) 88%, transparent);
+    border-bottom:1px solid var(--line)}
+  .topbar .inner{max-width:1120px;margin:0 auto;padding:8px 22px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .topbar .brand{font-weight:700;font-size:14px;margin-right:auto;color:var(--ink2)}
+  .btn{font:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--line2);
+    background:var(--card);color:var(--ink2);border-radius:999px;padding:5px 12px;transition:.15s}
+  .btn:hover{border-color:var(--brand);color:var(--brand)}
+  .btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .path-fallback{flex-basis:100%;font-size:12.4px;color:var(--muted);margin-top:2px}
+  .path-fallback code{user-select:all;background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+
+  .jsoff{margin:14px auto 0;max-width:1120px;padding:0 22px}
+  .jsoff .box{border:1px solid var(--warn-line);background:var(--warn-soft);color:var(--warn);
+    border-radius:12px;padding:11px 14px;font-size:13.6px;line-height:1.6}
+  html.js .jsoff{display:none}
+
+  .hero{padding:34px 0 22px;background:linear-gradient(160deg,var(--card),var(--bg))}
+  .hero .kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+  .hero h1{font-size:31px;margin-top:8px;letter-spacing:.3px;overflow-wrap:anywhere}
+  .hero .sub{margin-top:10px;color:var(--ink2);max-width:900px;font-size:16.2px}
+  .hero .meta{margin-top:12px;font-size:12.8px;color:var(--muted)}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .badge{font-size:12.6px;font-weight:600;border-radius:999px;padding:4px 11px;border:1px solid}
+  .badge.ok{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-line)}
+  .badge.warn{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-line)}
+  .badge.bad{color:var(--bad);background:var(--bad-soft);border-color:var(--bad-line)}
+
+  nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  nav.toc a{font-size:12.8px;border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:3px 11px;color:var(--ink2)}
+  nav.toc a:hover{border-color:var(--brand);color:var(--brand);text-decoration:none}
+
+  section{margin:26px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 26px}
+  .sec-head{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:4px}
+  .sec-no{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--brand);background:var(--soft);border-radius:6px;padding:2px 7px}
+  .lead{color:var(--ink2);font-size:16.2px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+  .kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--bg)}
+  .kpi .k{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:20px;font-weight:700;margin-top:3px}
+  .kpi .n{font-size:12px;color:var(--muted);margin-top:2px}
+  .kpi.ok .v{color:var(--ok)}.kpi.warn .v{color:var(--warn)}.kpi.brand .v{color:var(--brand)}
+  .ev{display:inline-block;margin-top:8px;font-size:12.4px;color:var(--muted);
+    background:var(--bg);border:1px dashed var(--line2);border-radius:8px;padding:3px 8px}
+  .ev b{color:var(--ink2);font-weight:600}
+
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+  .layer{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:14px 15px}
+  .layer .tag{font-family:var(--mono);font-size:11.5px;color:var(--brand);font-weight:700}
+  .layer h3{margin-top:4px}
+  .layer p{font-size:14px;color:var(--ink2)}
+  .layer ul{margin:8px 0 0 18px;padding:0;font-size:13.6px;color:var(--ink2)}
+  .layer li{margin:3px 0}
+
+  .figure{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px;margin-top:14px}
+  .figure figcaption{font-size:12.8px;color:var(--muted);padding:6px 6px 2px}
+  svg{display:block;width:100%;height:auto}
+  .topo text{font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+
+  .table-wrap{overflow-x:auto;margin-top:12px}
+  .table-wrap table{margin-top:0;min-width:0}
+  table{width:100%;border-collapse:collapse;font-size:14.2px;margin-top:12px;table-layout:fixed}
+  th,td{overflow-wrap:anywhere;word-break:break-word}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--bg);font-size:13px;color:var(--ink2)}
+  tr:nth-child(even) td{background:color-mix(in srgb, var(--bg) 55%, transparent)}
+  .status{white-space:nowrap;font-weight:600;font-size:13px}
+  .status.ok{color:var(--ok)}.status.warn{color:var(--warn)}.status.bad{color:var(--bad)}
+
+  details.tl{border:1px solid var(--line);border-radius:12px;background:var(--card);margin-top:10px;overflow:hidden}
+  details.tl summary{cursor:pointer;padding:11px 15px;font-weight:600;font-size:15px;list-style:none;display:flex;gap:10px;align-items:baseline}
+  details.tl summary::-webkit-details-marker{display:none}
+  details.tl summary .t{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:110px}
+  details.tl summary .chev{margin-left:auto;color:var(--muted);font-size:11px;transition:transform .18s}
+  details.tl[open] summary .chev{transform:rotate(90deg)}
+  details.tl .body{padding:2px 16px 14px;border-top:1px solid var(--line);font-size:14.4px;color:var(--ink2)}
+
+  .callout{border-left:3px solid var(--brand);background:var(--soft);border-radius:8px;padding:10px 13px;margin:12px 0;font-size:14.2px;color:var(--ink2)}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+
+  footer{border-top:1px solid var(--line);margin-top:36px;padding:22px 0 40px;background:var(--bg)}
+  footer p{font-size:13px;color:var(--muted);margin:.3em 0}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:var(--ink);color:var(--bg);font-size:13.4px;padding:9px 16px;border-radius:999px;
+    transition:opacity .18s,transform .18s;z-index:50;max-width:80vw}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:1060px){ .kpis{grid-template-columns:repeat(2,1fr)} .grid3{grid-template-columns:1fr} }
+  @media (max-width:720px){ .card{padding:18px 16px} .wrap{padding:0 14px} .hero h1{font-size:24px} table{font-size:13px} }
+  @media print{
+    .topbar,.jsoff,nav.toc,#toast{display:none!important}
+    body{background:#fff;color:#111}
+    .card,.layer,details.tl{box-shadow:none;border-color:#ccc;break-inside:avoid}
+    a{color:#111;text-decoration:underline}
+  }
+</style>
+</head>
+<body data-page-path="reports/lan-collaboration-2026-11-24.html">
+
+<div class="topbar">
+  <div class="inner">
+    <span class="brand">局域网多机 DSH 协作 · 结案讲解</span>
+    <button class="btn" id="theme-toggle" type="button" aria-pressed="false" title="切换色调：自动 / 浅色 / 深色">🌗 自动</button>
+    <button class="btn" id="copy-path" type="button">复制本页路径</button>
+    <button class="btn" id="expand-btn" type="button">展开全部</button>
+    <button class="btn" id="print-btn" type="button">打印 / PDF</button>
+  </div>
+</div>
+
+<div class="jsoff">
+  <div class="box">
+    <b>当前是静态预览：脚本未启用。</b>正文、图表与折叠项仍可读，但主题切换、复制路径、展开/收起不可用。
+    在 DSH 里获得完整交互：<b>设置 → 通用 → Coding Tools（开发者工具）</b>打开，或点预览右上角<b>「在应用外打开」</b>用系统浏览器查看。
+  </div>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Stage close · 2026-11-20 → 2026-11-24</div>
+    <h1>四台 DSH，从“各自为政”到“可互通、可派活、可观测、可免 token 进入”</h1>
+    <p class="sub">本阶段把局域网里的 4 个 DSH web 实例连成最小协作闭环：会话消息、薄任务调度、只读状态面板、可信 LAN 网关。四层链路均已实测；剩余项是增强，不是本阶段阻塞。</p>
+    <div class="badges">
+      <span class="badge ok">✅ 本阶段已结案</span>
+      <span class="badge ok">✅ 四节点 4/4 在线</span>
+      <span class="badge warn">⚠️ 增强项已登记</span>
+      <span class="badge bad">❌ Windows 桌面版未修复</span>
+    </div>
+    <div class="meta">事实截至 <b>2026-11-24</b> · 单文件、离线可开 · 本页不改变任何代码或状态</div>
+    <nav class="toc">
+      <a href="#summary">一页看懂</a>
+      <a href="#topology">拓扑</a>
+      <a href="#layers">四层链路</a>
+      <a href="#validation">验收数字</a>
+      <a href="#limits">限制与残留</a>
+      <a href="#next">下一步</a>
+      <a href="#sources">证据索引</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="summary">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">00</span><h2>一页看懂</h2></div>
+      <p class="lead">三句话：<b>四条链路已通</b>；<b>核心风险是“薄层 + 明文 LAN + 面板无认证”</b>；<b>下一步应做运营化与安全增强，而不是继续堆功能</b>。</p>
+      <div class="kpis">
+        <div class="kpi ok"><div class="k">节点在线</div><div class="v">4 / 4</div><div class="n">A/B/C/D 全部 up</div></div>
+        <div class="kpi brand"><div class="k">调度单测</div><div class="v">23 / 23</div><div class="n">+ 故障注入 8/8</div></div>
+        <div class="kpi brand"><div class="k">网关单测</div><div class="v">16 / 16</div><div class="n">四节点 302 + cookie</div></div>
+        <div class="kpi ok"><div class="k">模型渠道</div><div class="v">7 provider</div><div class="n">四节点 catalog 均通过</div></div>
+      </div>
+      <span class="ev"><b>证据：</b><code>docs/briefs/lan-collaboration-stage-close-20261124.md</code> · <code>plugin-lan-scheduler/docs/04-audit-recheck.md</code></span>
+    </div>
+  </section>
+
+  <section id="topology">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">01</span><h2>最终拓扑</h2></div>
+      <p class="lead">三台机器、四个独立 DSH web 实例；只有 dsh-a 是 active coordinator。状态面板与免 token 网关是旁路，不改变 DSH 原生 3081 的认证。</p>
+      <figure class="figure">
+        <svg class="topo" viewBox="0 0 960 360" role="img" aria-label="四台 DSH 实例拓扑：dsh-a 协调者，dsh-b/c/d 为 agent">
+          <rect x="1" y="1" width="958" height="358" rx="14" fill="none" stroke="#cfd8e3"/>
+          <text x="28" y="34" font-size="13" fill="#67737f">LAN 192.168.3.0/24 · 明文 HTTP/WS · 仅可信网段</text>
+
+          <rect x="350" y="58" width="260" height="96" rx="12" fill="#eaf1ff" stroke="#2f6fed" stroke-width="1.6"/>
+          <text x="480" y="86" text-anchor="middle" font-size="17" font-weight="700" fill="#17212f">dsh-a · coordinator</text>
+          <text x="480" y="109" text-anchor="middle" font-size="12.5" fill="#33414f">192.168.3.23:3081</text>
+          <text x="480" y="129" text-anchor="middle" font-size="12" fill="#33414f">panel :3091 · gateway :3095</text>
+          <text x="480" y="146" text-anchor="middle" font-size="11.5" fill="#67737f">scheduler ledger · aggregate</text>
+
+          <rect x="36" y="222" width="210" height="84" rx="12" fill="#ffffff" stroke="#cfd8e3"/>
+          <text x="141" y="250" text-anchor="middle" font-size="15" font-weight="700" fill="#17212f">dsh-c</text>
+          <text x="141" y="272" text-anchor="middle" font-size="12" fill="#33414f">192.168.3.21:3081</text>
+          <text x="141" y="290" text-anchor="middle" font-size="11.5" fill="#67737f">agent · :3091 · :3095</text>
+
+          <rect x="375" y="222" width="210" height="84" rx="12" fill="#ffffff" stroke="#cfd8e3"/>
+          <text x="480" y="250" text-anchor="middle" font-size="15" font-weight="700" fill="#17212f">dsh-b</text>
+          <text x="480" y="272" text-anchor="middle" font-size="12" fill="#33414f">192.168.3.23:3082</text>
+          <text x="480" y="290" text-anchor="middle" font-size="11.5" fill="#67737f">agent · :3092 · :3096</text>
+
+          <rect x="714" y="222" width="210" height="84" rx="12" fill="#ffffff" stroke="#cfd8e3"/>
+          <text x="819" y="250" text-anchor="middle" font-size="15" font-weight="700" fill="#17212f">dsh-d</text>
+          <text x="819" y="272" text-anchor="middle" font-size="12" fill="#33414f">192.168.3.24:3081</text>
+          <text x="819" y="290" text-anchor="middle" font-size="11.5" fill="#67737f">agent · :3091 · :3095</text>
+
+          <path d="M480 154 L141 222" stroke="#2f6fed" stroke-width="1.6" fill="none"/>
+          <path d="M480 154 L480 222" stroke="#2f6fed" stroke-width="1.6" fill="none"/>
+          <path d="M480 154 L819 222" stroke="#2f6fed" stroke-width="1.6" fill="none"/>
+          <text x="300" y="196" font-size="11.5" fill="#2f6fed">WebSocket /interconnect/link</text>
+          <text x="596" y="196" font-size="11.5" fill="#2f6fed">消息 + 任务回执</text>
+
+          <rect x="36" y="58" width="250" height="96" rx="12" fill="#f7f9fc" stroke="#cfd8e3" stroke-dasharray="5 4"/>
+          <text x="161" y="85" text-anchor="middle" font-size="14" font-weight="700" fill="#17212f">状态面板</text>
+          <text x="161" y="107" text-anchor="middle" font-size="12" fill="#33414f">GET /self · /status · /</text>
+          <text x="161" y="127" text-anchor="middle" font-size="11.5" fill="#67737f">DSH 左侧 dock 入口</text>
+          <text x="161" y="145" text-anchor="middle" font-size="11.5" fill="#67737f">同源 /lan-status/* 代理</text>
+
+          <rect x="674" y="58" width="250" height="96" rx="12" fill="#f7f9fc" stroke="#cfd8e3" stroke-dasharray="5 4"/>
+          <text x="799" y="85" text-anchor="middle" font-size="14" font-weight="700" fill="#17212f">可信 LAN 网关</text>
+          <text x="799" y="107" text-anchor="middle" font-size="12" fill="#33414f">token → dsh-auth cookie</text>
+          <text x="799" y="127" text-anchor="middle" font-size="11.5" fill="#67737f">CIDR allowlist</text>
+          <text x="799" y="145" text-anchor="middle" font-size="11.5" fill="#67737f">3081 仍保留 token</text>
+        </svg>
+        <figcaption>图 1 · 四个 DSH 实例与两条旁路。任务面仍走 dsh-interconnect 的 WebSocket；状态/入口不改变 DSH 认证。</figcaption>
+      </figure>
+      <div class="callout warn"><b>部署事实：</b><code>.21/.23</code> 用 systemd 用户服务常驻；<code>.24</code> 用计划任务 <code>DSH-LAN-D</code>，另有 <code>DSH-LAN-Watchdog</code> 每 5 分钟检查 3081。当前不用 SSH 隧道，全链路明文，只适用于可信网段。</div>
+      <span class="ev"><b>证据：</b><code>docs/briefs/lan-dsh-interconnect-test.md</code> §1 · <code>AGENTS.md</code> §11</span>
+    </div>
+  </section>
+
+  <section id="layers">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">02</span><h2>四层链路</h2></div>
+      <p class="lead">每一层只做一件事；不把“消息”误当“任务”，也不把“面板”做成控制面。</p>
+      <div class="grid3">
+        <div class="layer">
+          <div class="tag">LAYER 1 · MESSAGE</div>
+          <h3>dsh-interconnect</h3>
+          <p>DSH 原生 WebSocket 消息与唤醒。</p>
+          <ul>
+            <li>0.17.0，四实例 peers 全 up</li>
+            <li>同机 A↔B、跨机 C/D 双向实测</li>
+            <li>只到“会话消息”权限面</li>
+          </ul>
+        </div>
+        <div class="layer">
+          <div class="tag">LAYER 2 · TASK</div>
+          <h3>lan-scheduler</h3>
+          <p>薄任务层：登记、排队、派发、回执、重试、审计。</p>
+          <ul>
+            <li>9 个 <code>sched_*</code> 工具，单协调者</li>
+            <li>append-only journal + fencing</li>
+            <li>23/23 单测；8/8 故障注入</li>
+          </ul>
+        </div>
+        <div class="layer">
+          <div class="tag">LAYER 3 · OBSERVE</div>
+          <h3>lan-status</h3>
+          <p>只读值班台：节点、会话、任务、资源、入口。</p>
+          <ul>
+            <li>Host 值班台 + Client dock 入口</li>
+            <li>A 与本地 desktop 视觉验证</li>
+            <li>9/9 单测；四节点 4/4</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="layer">
+          <div class="tag">LAYER 4 · ACCESS</div>
+          <h3>lan-trust</h3>
+          <p>可信 LAN 自动登录网关。</p>
+          <ul>
+            <li>服务端换 cookie，token 不进浏览器</li>
+            <li>四节点 3095/3096 均 302+cookie</li>
+            <li>16/16 单测；3081 仍要 token</li>
+          </ul>
+        </div>
+        <div class="layer">
+          <div class="tag">SIDE · MODELS</div>
+          <h3>7 个 provider</h3>
+          <p>四节点与本机桌面同源模型渠道。</p>
+          <ul>
+            <li>catalog 7 provider、failures=[]</li>
+            <li>真实调用：zai/opencode-go/xiaomi/gitee OK</li>
+            <li>2 个不可用模型已下架</li>
+          </ul>
+        </div>
+        <div class="layer">
+          <div class="tag">SIDE · OPS</div>
+          <h3>磁盘与常驻</h3>
+          <p>清理、systemd、Windows 任务、watchdog。</p>
+          <ul>
+            <li>.23 6.29G free / 77.4%</li>
+            <li>.21 53.2G free / 53.7%</li>
+            <li>.24 C: 4.55G free / 85.5%</li>
+          </ul>
+        </div>
+      </div>
+      <span class="ev"><b>证据：</b><code>plugin-lan-scheduler/README.md</code> · <code>plugin-lan-status/README.md</code> · <code>plugin-lan-trust/README.md</code></span>
+    </div>
+  </section>
+
+  <section id="validation">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">03</span><h2>验收数字</h2></div>
+      <p class="lead">只列已实测的数字；未验证项单独放在“限制与残留”。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>项</th><th>结果</th><th>证据</th></tr></thead>
+        <tbody>
+          <tr><td>四节点在线</td><td><span class="status ok">✅ 4/4</span> · 任务 recent 14→30 随台账增长</td><td>A <code>/status?refresh=1</code></td></tr>
+          <tr><td>调度器单测</td><td><span class="status ok">✅ 23/23</span></td><td><code>plugin-lan-scheduler</code> <code>node --test</code></td></tr>
+          <tr><td>故障注入</td><td><span class="status ok">✅ 8/8</span> + 独立 hash 链 PASS</td><td><code>tests/fault/run.mjs</code> / <code>check.mjs</code></td></tr>
+          <tr><td>调度器审计</td><td><span class="status ok">✅ 复审 PASS</span>（首轮 PASS-WITH-FINDINGS）</td><td><code>docs/03</code> / <code>docs/04</code></td></tr>
+          <tr><td>四节点 E2E</td><td><span class="status ok">✅ 4/4 succeeded</span>，attempts=1</td><td>B <code>t-mwp1kdiz-25</code> / C <code>t-mwp1l21c-29</code> / D <code>t-mwp1ljr2-33</code> / A <code>t-mwp1m06j-37</code></td></tr>
+          <tr><td>状态面板</td><td><span class="status ok">✅ 9/9</span>；A/本地 dock 视觉验证</td><td><code>plugin-lan-status</code> <code>node --test</code></td></tr>
+          <tr><td>可信网关</td><td><span class="status ok">✅ 16/16</span>；四节点 302+cookie</td><td><code>plugin-lan-trust</code> <code>node --test</code></td></tr>
+          <tr><td>模型渠道</td><td><span class="status ok">✅ 7 provider</span>；四节点 zai 调用 OK</td><td><code>docs/briefs/lan-llm-channels-20261122.md</code></td></tr>
+          <tr><td>磁盘</td><td><span class="status ok">✅ 三机均释放</span></td><td>见 §3.6</td></tr>
+          <tr><td>OpenClaw ACP</td><td><span class="status ok">✅ ACP_PROD_OK</span>（异步委派）</td><td><code>docs/briefs/openclaw-dsh-integration-assessment.md</code> §7</td></tr>
+        </tbody>
+      </table></div>
+      <span class="ev"><b>证据：</b>本页数字均来自 <code>docs/briefs/lan-collaboration-stage-close-20261124.md</code> 及其引用文件。</span>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">04</span><h2>限制与残留</h2></div>
+      <p class="lead">结案不等于“全部完美”；下面这些项已登记，不阻塞本阶段，但不能当作已完成。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>项</th><th>状态</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>非信任源 403 端到端</td><td><span class="status warn">⚠️ 仅单测</span></td><td>本机无第二网段；建议隔离 VLAN 验证</td></tr>
+          <tr><td>B/C/D dock 视觉</td><td><span class="status warn">⚠️ 未逐台点开</span></td><td>包/配置/代理 200；A 与本地已视觉验证</td></tr>
+          <tr><td>面板认证</td><td><span class="status warn">⚠️ 无</span></td><td>只读且不持有 token；LAN 内可访问</td></tr>
+          <tr><td>网关安全边界</td><td><span class="status warn">⚠️ allowlist=owner</span></td><td>只允许直连可信 CIDR；不能公网/反代</td></tr>
+          <tr><td>Windows 桌面版</td><td><span class="status bad">❌ 未修复</span></td><td>host ready URL 303 正常，shell fetch ECONNRESET；已提供 LAN 快捷方式</td></tr>
+          <tr><td>调度层能力</td><td><span class="status warn">⚠️ 薄层</span></td><td>无 DAG/抢占/文件传输/多协调者共享台账</td></tr>
+          <tr><td>journal/队列上限</td><td><span class="status warn">⚠️ 未做</span></td><td>需监控或后续轮转</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout bad"><b>不要这样部署：</b>把 3095/3096 映射到公网、放在不可信反代后面、或把面板当成有认证的控制面。allowlist 内任意 IP 等价于 owner。</div>
+    </div>
+  </section>
+
+  <section id="next">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">05</span><h2>下一阶段</h2></div>
+      <p class="lead">按“运营化 → 安全 → 能力”排序；不建议继续在薄层上堆 DAG。</p>
+      <details class="tl" open>
+        <summary><span class="t">P0</span><span>运营化：单协调者 + 台账监控</span><span class="chev">▶</span></summary>
+        <div class="body">A 作为唯一任务入口；B/C/D 只保留 worker 工具面；为 journal/台账加轮转、容量告警与备份；把“任务成功/失败”接入面板 KPI。</div>
+      </details>
+      <details class="tl">
+        <summary><span class="t">P1</span><span>安全：面板认证 + 非信任 403 实测</span><span class="chev">▶</span></summary>
+        <div class="body">给面板加最小认证/限流；在隔离 VLAN 做非信任源 403 端到端；如跨不可信网络，再上 TLS/WireGuard。</div>
+      </details>
+      <details class="tl">
+        <summary><span class="t">P2</span><span>能力：依赖/DAG 与文件清单</span><span class="chev">▶</span></summary>
+        <div class="body">先做“任务依赖 + 文件清单 + 断点”最小闭环，不要直接做完整工作流引擎；跨机文件传输另走 mesh 或独立通道。</div>
+      </details>
+      <details class="tl">
+        <summary><span class="t">P3</span><span>Windows 桌面版单独立项</span><span class="chev">▶</span></summary>
+        <div class="body">抓 shell 侧具体 fetch URL/headers，或等上游修复；当前以 LAN 网关入口为可用替代。</div>
+      </details>
+    </div>
+  </section>
+
+  <section id="sources">
+    <div class="card">
+      <div class="sec-head"><span class="sec-no">06</span><h2>证据索引</h2></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>主题</th><th>唯一真源</th></tr></thead>
+        <tbody>
+          <tr><td>阶段结案报告</td><td><code>docs/briefs/lan-collaboration-stage-close-20261124.md</code></td></tr>
+          <tr><td>连通 / 安装 / 常驻</td><td><code>docs/briefs/lan-dsh-interconnect-test.md</code></td></tr>
+          <tr><td>四项跟进 + 调度增补</td><td><code>docs/briefs/lan-collaboration-followup-20261120.md</code></td></tr>
+          <tr><td>调度器</td><td><code>plugin-lan-scheduler/README.md</code> · <code>docs/00</code>–<code>04</code></td></tr>
+          <tr><td>状态面板</td><td><code>plugin-lan-status/README.md</code> · <code>docs/00</code>–<code>02</code></td></tr>
+          <tr><td>可信网关</td><td><code>plugin-lan-trust/README.md</code> · <code>docs/00</code></td></tr>
+          <tr><td>模型渠道</td><td><code>docs/briefs/lan-llm-channels-20261122.md</code></td></tr>
+          <tr><td>OpenClaw ACP</td><td><code>docs/briefs/openclaw-dsh-integration-assessment.md</code> §7</td></tr>
+          <tr><td>mesh 评估</td><td><code>docs/briefs/dsh-mesh-capability-assessment.md</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><b>版本：</b>DSH <code>0.2.2-rc.3</code> · dsh-interconnect <code>0.17.0</code> · scheduler <code>0.1.1</code> · status <code>0.3.0</code> · trust <code>0.1.0</code> · Node Linux <code>v24.22.3</code> / Windows <code>v24.13.0</code>。</div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>事实截至 2026-11-24。</b>本页是结案讲解材料，不构成新的状态记录；冲突时以 <code>docs/briefs/lan-collaboration-stage-close-20261124.md</code> 与各插件 <code>README</code>/<code>docs</code> 为准。</p>
+    <p>单文件、自包含、零外部依赖，可离线双击打开。</p>
+  </div>
+</footer>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  var root = document.documentElement;
+  var THEME_KEY = 'html-explainer-theme';
+  var MODES = ['auto', 'light', 'dark'];
+  var LABEL = { auto: '🌗 自动', light: '☀️ 浅色', dark: '🌙 深色' };
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+
+  function readTheme() {
+    try {
+      var v = localStorage.getItem(THEME_KEY);
+      return MODES.indexOf(v) >= 0 ? v : 'auto';
+    } catch (e) { return 'auto'; }
+  }
+  function writeTheme(v) {
+    try { localStorage.setItem(THEME_KEY, v); } catch (e) {}
+  }
+  function applyTheme(mode) {
+    if (mode === 'auto') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', mode);
+    var btn = document.getElementById('theme-toggle');
+    if (btn) {
+      btn.textContent = LABEL[mode];
+      btn.setAttribute('aria-pressed', mode === 'dark' ? 'true' : 'false');
+      btn.setAttribute('title', '当前：' + mode + '（点按切换 自动 → 浅色 → 深色）');
+    }
+  }
+
+  function toast(msg) {
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1900);
+  }
+
+  function showPathFallback(p) {
+    var host = document.querySelector('.topbar .inner');
+    if (!host) return;
+    var el = document.getElementById('path-fallback');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'path-fallback';
+      el.className = 'path-fallback';
+      el.innerHTML = '<span>本页路径：</span><code></code>';
+      host.appendChild(el);
+    }
+    el.querySelector('code').textContent = p;
+    try {
+      var range = document.createRange();
+      range.selectNodeContents(el.querySelector('code'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
+  }
+
+  function pagePath() {
+    var declared = document.body.getAttribute('data-page-path') || '';
+    if (location.protocol === 'file:') {
+      try {
+        var p = decodeURIComponent(location.pathname);
+        if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+        p = p.replace(/\//g, '\\');
+        if (p) return p;
+      } catch (e) {}
+    }
+    return declared;
+  }
+
+  function fallbackCopy(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      done(ok);
+    } catch (e) { done(false); }
+  }
+
+  function copyText(text, done) {
+    if (!text) { done(false); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { fallbackCopy(text, done); });
+      return;
+    }
+    fallbackCopy(text, done);
+  }
+
+  var current = readTheme();
+  applyTheme(current);
+  var themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function () {
+      current = MODES[(MODES.indexOf(current) + 1) % MODES.length];
+      applyTheme(current);
+      writeTheme(current);
+      toast('色调：' + { auto: '跟随系统', light: '浅色', dark: '深色' }[current]);
+    });
+  }
+
+  var copyBtn = document.getElementById('copy-path');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      var p = pagePath();
+      copyText(p, function (ok) {
+        if (ok) toast('已复制：' + p);
+        else { showPathFallback(p); toast('复制失败（浏览器权限限制），路径已显示，可手动选中复制'); }
+      });
+    });
+  }
+
+  var expandBtn = document.getElementById('expand-btn');
+  var allOpen = false;
+  if (expandBtn) {
+    expandBtn.addEventListener('click', function () {
+      allOpen = !allOpen;
+      var items = document.querySelectorAll('details');
+      for (var i = 0; i < items.length; i++) items[i].open = allOpen;
+      expandBtn.textContent = allOpen ? '收起全部' : '展开全部';
+    });
+  }
+
+  var printBtn = document.getElementById('print-btn');
+  if (printBtn) {
+    printBtn.addEventListener('click', function () {
+      var items = document.querySelectorAll('details');
+      for (var i = 0; i < items.length; i++) items[i].open = true;
+      window.print();
+    });
+  }
+})();
+</script>
+</body>
+</html>

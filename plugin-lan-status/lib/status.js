@@ -16,10 +16,10 @@ export const RUNNING_STATES = new Set(['queued', 'dispatching', 'running'])
 export const TERMINAL_STATES = new Set(['succeeded', 'failed', 'cancelled'])
 
 export const DEFAULT_NODES = [
-  { instanceId: 'dsh-a', label: 'dsh-a', role: 'coordinator', origin: 'http://192.168.3.23:3081', agentUrl: 'http://192.168.3.23:3091' },
-  { instanceId: 'dsh-b', label: 'dsh-b', role: 'agent', origin: 'http://192.168.3.23:3082', agentUrl: 'http://192.168.3.23:3092' },
-  { instanceId: 'dsh-c', label: 'dsh-c', role: 'agent', origin: 'http://192.168.3.21:3081', agentUrl: 'http://192.168.3.21:3091' },
-  { instanceId: 'dsh-d', label: 'dsh-d', role: 'agent', origin: 'http://192.168.3.24:3081', agentUrl: 'http://192.168.3.24:3091' },
+  { instanceId: 'dsh-a', label: 'dsh-a', role: 'coordinator', origin: 'http://192.168.3.23:3081', entryUrl: 'http://192.168.3.23:3095', agentUrl: 'http://192.168.3.23:3091' },
+  { instanceId: 'dsh-b', label: 'dsh-b', role: 'agent', origin: 'http://192.168.3.23:3082', entryUrl: 'http://192.168.3.23:3096', agentUrl: 'http://192.168.3.23:3092' },
+  { instanceId: 'dsh-c', label: 'dsh-c', role: 'agent', origin: 'http://192.168.3.21:3081', entryUrl: 'http://192.168.3.21:3095', agentUrl: 'http://192.168.3.21:3091' },
+  { instanceId: 'dsh-d', label: 'dsh-d', role: 'agent', origin: 'http://192.168.3.24:3081', entryUrl: 'http://192.168.3.24:3095', agentUrl: 'http://192.168.3.24:3091' },
 ]
 
 function collator(a, b) {
@@ -161,6 +161,7 @@ export function buildSelfStatus({ ctx, config = {}, logger, startedAt = null } =
       label: String(config.label || config.instanceId || 'dsh'),
       role: config.role === 'coordinator' ? 'coordinator' : 'agent',
       origin: typeof config.origin === 'string' ? config.origin : null,
+      entryUrl: typeof config.entryUrl === 'string' ? config.entryUrl : null,
       agentUrl: typeof config.agentUrl === 'string' ? config.agentUrl : null,
       hostname: system.hostname,
       platform: system.platform,
@@ -193,6 +194,7 @@ export function configuredNodes(config = {}) {
         label: typeof row.label === 'string' ? row.label : row.instanceId,
         role: row.role === 'coordinator' ? 'coordinator' : 'agent',
         origin: typeof row.origin === 'string' ? row.origin : null,
+        entryUrl: typeof row.entryUrl === 'string' ? row.entryUrl : null,
         agentUrl: typeof row.agentUrl === 'string' ? row.agentUrl : null,
       }))
   }
@@ -228,6 +230,7 @@ async function fetchSelf(node, timeoutMs) {
       label: node.label,
       role: node.role,
       origin: node.origin || live.origin || null,
+      entryUrl: node.entryUrl || live.entryUrl || null,
       agentUrl: node.agentUrl,
       online: true,
       latencyMs,
@@ -265,6 +268,7 @@ export async function buildAggregateStatus({ ctx, config = {}, self, logger, sta
           label: node.label,
           role: node.role,
           origin: node.origin || self.node.origin || null,
+          entryUrl: node.entryUrl || self.node.entryUrl || null,
           agentUrl: node.agentUrl || self.node.agentUrl || null,
           online: true,
           latencyMs: 0,

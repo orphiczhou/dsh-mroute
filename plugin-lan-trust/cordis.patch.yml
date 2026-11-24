@@ -1,0 +1,11 @@
+- insert:
+    - id: lan-trust
+      name: '@local/dsh-lan-trust'
+      config:
+        enabled: true
+        port: 3095
+        allowLoopback: true
+        allowedCidrs:
+          - 192.168.3.0/24
+          - 127.0.0.1/32
+          - '::1/128'

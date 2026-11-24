@@ -56,7 +56,7 @@ test('coordinator server exposes health, self, status and HTML', async () => {
     const html = await fetch(`${base}/`)
     assert.equal(html.status, 200)
     assert.match(html.headers.get('content-type') || '', /text\/html/)
-    assert.match(html.headers.get('content-security-policy') || '', /frame-ancestors 'none'/)
+    assert.match(html.headers.get('content-security-policy') || '', /frame-ancestors 'self'/)
     assert.equal(html.headers.get('access-control-allow-origin'), null)
     assert.match(await html.text(), /LAN DSH/)
 

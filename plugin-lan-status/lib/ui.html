@@ -145,30 +145,6 @@ button { cursor: pointer; }
 .probe-link b { color: var(--accent); font-weight: 650; }
 .probe-link.bad { border-color: rgba(251, 113, 133, .32); color: var(--err); }
 .probe-arrow { color: var(--faint); }
-.entry-overlay {
-  position: fixed; inset: 0; z-index: 50; display: none; place-items: center;
-  padding: 18px; background: rgba(2, 6, 12, .68); backdrop-filter: blur(4px);
-}
-.entry-overlay.open { display: grid; }
-.entry-dialog {
-  width: min(520px, 100%); border: 1px solid var(--line-strong); border-radius: 18px;
-  background: var(--panel-solid); box-shadow: 0 30px 90px rgba(0, 0, 0, .5); padding: 20px;
-}
-.entry-dialog h2 { margin: 0 0 4px; font-size: 18px; letter-spacing: -.02em; }
-.entry-dialog .sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; overflow-wrap: anywhere; }
-.entry-dialog .warn {
-  margin: 0 0 14px; padding: 9px 11px; border-radius: 10px;
-  border: 1px solid rgba(251, 191, 36, .28); background: rgba(251, 191, 36, .07);
-  color: var(--warn); font-size: 11px; line-height: 1.5;
-}
-.entry-row { display: flex; gap: 8px; margin-top: 10px; }
-.entry-row .btn { flex: none; }
-.entry-row input {
-  flex: 1; min-width: 0; border: 1px solid var(--line-strong); background: var(--panel-2);
-  color: var(--ink); border-radius: 10px; padding: 8px 10px; outline: none; font-size: 13px;
-}
-.entry-row input:focus { border-color: var(--accent); }
-.entry-help { margin: 10px 0 0; color: var(--faint); font-size: 11px; line-height: 1.55; }
 .node-card {
   position: relative; overflow: hidden;
   border: 1px solid var(--line); border-radius: 18px; padding: 17px 17px 14px;
@@ -351,27 +327,6 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
 </aside>
 <div class="toast" id="toast"></div>
 
-<div class="entry-overlay" id="entry-overlay">
-  <div class="entry-dialog" role="dialog" aria-modal="true" aria-labelledby="entry-title">
-    <h2 id="entry-title">打开节点 DSH</h2>
-    <p class="sub" id="entry-sub"></p>
-    <p class="warn">DSH Web 需要该节点自己的 launch token。面板不保存、不转发 token；token 只提交给该节点。使用后请关闭节点标签，避免 token 留在浏览器历史。</p>
-    <div class="entry-row">
-      <button class="btn primary" id="entry-direct" type="button">直接打开（若已解锁）</button>
-      <button class="btn ghost" id="entry-cancel" type="button">取消</button>
-    </div>
-    <form id="entry-form" method="get" target="_blank" rel="noopener noreferrer" style="margin-top:12px">
-      <input type="hidden" name="interactions" value="answer">
-      <label class="sub" for="entry-token">使用 launch token 解锁</label>
-      <div class="entry-row">
-        <input id="entry-token" name="token" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off" placeholder="粘贴 launch token（不会显示）">
-        <button class="btn primary" type="submit">解锁并打开</button>
-      </div>
-    </form>
-    <p class="entry-help">token 取自节点 owner 提供的一次性 launch URL 中 <span class="mono">token=</span> 之后的部分。表单由浏览器直接提交到节点 <span class="mono">/connect</span>，不经过本面板。LAN 明文传输仅限可信网段。</p>
-  </div>
-</div>
-
 <script>
 (function () {
   'use strict'
@@ -534,7 +489,7 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
       var title = el('div', { class: 'node-id' },
         el('span', { class: 'status-dot ' + dotClass }),
         el('h3', { text: node.label || node.instanceId }),
-        el('span', { class: 'id', text: node.instanceId }),
+        node.label && node.label !== node.instanceId ? el('span', { class: 'id', text: node.instanceId }) : null,
         el('span', { class: 'role' + (node.role === 'coordinator' ? ' coordinator' : ''), text: node.role })
       )
       card.append(el('div', { class: 'node-top' }, title, el('span', { class: 'latency', text: node.online ? (node.latencyMs == null ? '—' : node.latencyMs + ' ms') : 'offline' })))
@@ -718,13 +673,6 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
     root.append(el('dt', { text: key }), el('dd', { text: value == null || value === '' ? '—' : String(value) }))
   }
 
-  function closeEntry() {
-    var overlay = $('entry-overlay')
-    overlay.classList.remove('open')
-    var input = $('entry-token')
-    if (input) input.value = ''
-  }
-
   function safeOrigin(value) {
     try {
       var url = new URL(value)
@@ -738,25 +686,16 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
     var node = nodeById(id)
     if (!node) return
     if (!node.online) { toast('节点离线，无法打开界面'); return }
-    var origin = safeOrigin(node.origin)
-    if (!origin) { toast('该节点没有配置可用的入口地址'); return }
-    $('entry-title').textContent = '打开 ' + (node.label || node.instanceId)
-    $('entry-sub').textContent = origin + '  ·  ' + (node.dshVersion || 'DSH')
-    var direct = $('entry-direct')
-    direct.disabled = false
-    direct.onclick = function () { window.open(origin, '_blank', 'noopener,noreferrer') }
-    var form = $('entry-form')
-    form.action = origin + '/connect'
-    form.reset()
-    $('entry-overlay').classList.add('open')
-    setTimeout(function () { $('entry-token').focus() }, 30)
+    var entry = safeOrigin(node.entryUrl || node.origin)
+    if (!entry) { toast('该节点没有配置可用的入口地址'); return }
+    window.open(entry, '_blank', 'noopener,noreferrer')
   }
 
   function render(data) {
     state.data = data
     renderHealth(data)
     $('timestamp').textContent = '更新于 ' + fmtTime(data.generatedAt)
-    $('mode-note').textContent = '入口：不保存 token；打开时由浏览器直接提交到节点 /connect'
+    $('mode-note').textContent = '入口：可信 LAN 自动登录（网关换 cookie，无需输入 token）'
     summaryKpis(data)
     renderProbe(data)
     renderNodes(data)
@@ -771,7 +710,7 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
     state.loading = true
     $('refresh').disabled = true
     try {
-      var response = await fetch('/status' + (force ? '?refresh=1' : ''), { cache: 'no-store', headers: { accept: 'application/json' } })
+      var response = await fetch('status' + (force ? '?refresh=1' : ''), { cache: 'no-store', headers: { accept: 'application/json' } })
       if (!response.ok) throw new Error('HTTP ' + response.status)
       render(await response.json())
     } catch (error) {
@@ -794,13 +733,6 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
   })
   $('overlay').addEventListener('click', closeDetail)
   $('d-close').addEventListener('click', closeDetail)
-  $('entry-overlay').addEventListener('click', function (event) {
-    if (event.target === $('entry-overlay')) closeEntry()
-  })
-  $('entry-cancel').addEventListener('click', closeEntry)
-  $('entry-form').addEventListener('submit', function () {
-    setTimeout(function () { $('entry-token').value = '' }, 0)
-  })
   $('d-tabs').addEventListener('click', function (event) {
     var tab = event.target.closest('[data-tab]')
     if (!tab) return
@@ -812,7 +744,7 @@ pre.raw { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius
     if (state.data) renderSessions(state.data)
   })
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') { closeDetail(); closeEntry() }
+    if (event.key === 'Escape') { closeDetail() }
   })
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && state.data) load(false)

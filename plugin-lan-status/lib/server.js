@@ -19,9 +19,9 @@ const SECURITY_HEADERS = {
   'cache-control': 'no-store',
   'referrer-policy': 'no-referrer',
   'x-content-type-options': 'nosniff',
-  'x-frame-options': 'DENY',
+  'x-frame-options': 'SAMEORIGIN',
   'permissions-policy': 'geolocation=(), microphone=(), camera=()',
-  'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action http: https:; base-uri 'self'; frame-ancestors 'none'",
+  'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action http: https:; base-uri 'self'; frame-ancestors 'self'",
 }
 
 function sendJson(res, status, payload) {
@@ -59,6 +59,7 @@ function normalizeConfig(config = {}) {
     host: typeof config.host === 'string' && config.host !== '' ? config.host : '0.0.0.0',
     port: Number.isInteger(config.port) ? config.port : 3091,
     origin: typeof config.origin === 'string' ? config.origin : '',
+    entryUrl: typeof config.entryUrl === 'string' ? config.entryUrl : '',
     agentUrl: typeof config.agentUrl === 'string' ? config.agentUrl : '',
     dshVersion: typeof config.dshVersion === 'string' ? config.dshVersion : '',
     schedulerStateFile: typeof config.schedulerStateFile === 'string' ? config.schedulerStateFile : '',

@@ -124,8 +124,9 @@ test('buildAggregateStatus keeps self local and marks unreachable nodes offline'
 test('renderPanelHtml returns a self-contained panel page', () => {
   const html = renderPanelHtml({ panelTitle: 'LAN Test · Nodes', coordinator: 'dsh-test' })
   assert.match(html, /LAN Test · Nodes/)
-  assert.match(html, /fetch\('\/status'/)
-  assert.match(html, /entry-form/)
+  assert.match(html, /fetch\('status'/)
+  assert.match(html, /entryUrl/)
+  assert.doesNotMatch(html, /entry-form|name="token"|launch token/)
   assert.doesNotMatch(html, /src="http/)
   assert.doesNotMatch(html, /\/open\//)
 })

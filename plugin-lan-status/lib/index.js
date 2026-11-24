@@ -5,11 +5,12 @@
  * deployment-specific config. The coordinator exposes the aggregate panel;
  * every node exposes `/self` for the coordinator to poll.
  *
- * This plugin intentionally has no DSH client half: a standalone HTTP page is
- * enough for a read-only status view and avoids coupling to the DSH client
- * graph. See README.md for the profile patch example.
+ * The optional client half embeds `/lan-status/` from the DSH origin. This
+ * host half registers that same-origin prefix and proxies it to the standalone
+ * panel server, so the client needs neither CORS nor a second frame origin.
  */
 import { createStatusServer } from './server.js'
+import { createPanelProxy } from './panel-proxy.js'
 
 export const name = 'lan-status'
 export const inject = ['agents']
@@ -17,22 +18,39 @@ export const inject = ['agents']
 export function apply(ctx, config = {}) {
   const startedAt = new Date().toISOString()
   const logger = ctx?.logger
-  const instance = createStatusServer({ ctx, config, logger, startedAt })
+  const serve = config.serve !== false
+  const panelUrl = typeof config.panelUrl === 'string' ? config.panelUrl : ''
+  let instance = null
 
-  ctx.effect(() => {
-    let stopped = false
-    instance.start().catch((error) => {
-      if (stopped) return
-      logger?.error?.(`[lan-status] failed to start on ${instance.config.host}:${instance.config.port}: ${error?.stack || error}`)
+  if (serve) {
+    instance = createStatusServer({ ctx, config, logger, startedAt })
+    ctx.effect(() => {
+      let stopped = false
+      instance.start().catch((error) => {
+        if (stopped) return
+        logger?.error?.(`[lan-status] failed to start on ${instance.config.host}:${instance.config.port}: ${error?.stack || error}`)
+      })
+      return () => {
+        stopped = true
+        void instance.close()
+      }
+    }, 'lan-status-http')
+  }
+
+  // The DSH web server is optional: headless nodes still run the standalone
+  // panel server, while web nodes also get a same-origin route for the client.
+  if (panelUrl) {
+    ctx.inject(['webServer'], (wctx) => {
+      wctx.effect(
+        () => wctx.webServer.register({ kind: 'prefix', path: '/lan-status', handler: createPanelProxy(panelUrl) }),
+        'lan-status-panel-route',
+      )
+      logger?.info?.(`[lan-status] client panel mounted at /lan-status -> ${panelUrl}`)
     })
-    return () => {
-      stopped = true
-      void instance.close()
-    }
-  }, 'lan-status-http')
+  }
 
   return {
     server: instance,
-    close: () => instance.close(),
+    close: () => instance?.close(),
   }
 }
